@@ -71,6 +71,12 @@ const static std::string DEFAULT_CONFIG = R"x({
 
     "fossil-collection" : {
         "objects-per-cycle": 100
+    },
+
+    "core-binding" : {
+        // Valid options are "ascending", "descending", and "none"
+        "order" : "none",
+        "initial-cpu" : 0
     }
 },
 
@@ -279,6 +285,18 @@ Configuration::makeDispatcher(std::shared_ptr<TimeWarpCommunicationManager> comm
             invalid_string += std::string("\tFossil collection objects per cycle\n");
         }
 
+        // CORE BINDING
+        unsigned int initial_cpu = (*root_)["time-warp"]["core-binding"]["initial-cpu"].asUInt();
+        auto bind_order_s = (*root_)["time-warp"]["core-binding"]["order"].asString();
+        auto bind_order = TimeWarpEventDispatcher::BindOrder::None;
+        if (bind_order_s == "ascending") {
+            bind_order = TimeWarpEventDispatcher::BindOrder::Ascending;
+        } else if (bind_order_s == "descending") {
+            bind_order = TimeWarpEventDispatcher::BindOrder::Descending;
+        } else if (bind_order_s == "none") {
+            bind_order = TimeWarpEventDispatcher::BindOrder::None;
+        }
+
         if (!invalid_string.empty()) {
             throw std::runtime_error(std::string("Configuration files do not match, \
 check the following configurations:\n") + invalid_string);
@@ -308,7 +326,7 @@ check the following configurations:\n") + invalid_string);
             num_worker_threads, num_schedulers, comm_manager, std::move(event_set),
             std::move(mattern_gvt_manager), std::move(local_gvt_manager), std::move(state_manager),
             std::move(output_manager), std::move(twfs_manager), std::move(termination_manager),
-            std::move(tw_stats), fc_objects_per_cycle);
+            std::move(tw_stats), fc_objects_per_cycle, bind_order, initial_cpu);
     }
 
     if (comm_manager->getNumProcesses() > 1) {

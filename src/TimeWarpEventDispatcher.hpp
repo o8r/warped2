@@ -38,6 +38,8 @@ enum class MatternColor;
 
 class TimeWarpEventDispatcher : public EventDispatcher {
 public:
+    enum class BindOrder { Ascending, Descending, None };
+
     TimeWarpEventDispatcher(unsigned int max_sim_time,
         unsigned int num_worker_threads,
         unsigned int num_schedulers,
@@ -50,11 +52,13 @@ public:
         std::unique_ptr<TimeWarpFileStreamManager> twfs_manager,
         std::unique_ptr<TimeWarpTerminationManager> termination_manager,
         std::unique_ptr<TimeWarpStatistics> tw_stats,
-        unsigned int fc_objects_per_cycle);
+        unsigned int fc_objects_per_cycle, BindOrder bind_order, unsigned int initial_cpu);
 
     void startSimulation(const std::vector<std::vector<SimulationObject*>>& objects);
 
 private:
+    void bindThread(pthread_t t, unsigned int thread_id);
+
     void sendEvents(std::vector<std::shared_ptr<Event>> new_events,
                     unsigned int sender_object_id, SimulationObject *sender_object);
 
@@ -107,6 +111,10 @@ private:
     const std::unique_ptr<TimeWarpStatistics> tw_stats_;
 
     unsigned int fc_objects_per_cycle_;
+
+    BindOrder bind_order_;
+
+    unsigned int initial_cpu_;
 
     std::unique_ptr<unsigned int []> object_simulation_time_;
 
