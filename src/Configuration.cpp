@@ -343,17 +343,11 @@ check the following configurations:\n") + invalid_string);
         }
 
         return make_unique<TimeWarpEventDispatcher>(max_sim_time_,
-<<<<<<< HEAD
-            num_worker_threads, num_schedulers, comm_manager, std::move(event_set),
-            std::move(mattern_gvt_manager), std::move(local_gvt_manager), std::move(state_manager),
-            std::move(output_manager), std::move(twfs_manager), std::move(termination_manager),
-            std::move(tw_stats), fc_objects_per_cycle, bind_order, initial_cpu);
-=======
-            num_worker_threads, num_schedulers, is_lp_migration_on, comm_manager, 
-            std::move(event_set), std::move(mattern_gvt_manager), std::move(local_gvt_manager), 
-            std::move(state_manager), std::move(output_manager), std::move(twfs_manager), 
-            std::move(termination_manager),std::move(tw_stats), fc_objects_per_cycle);
->>>>>>> master
+            num_worker_threads, num_schedulers, is_lp_migration_on, comm_manager,
+            std::move(event_set), std::move(mattern_gvt_manager), std::move(local_gvt_manager),
+            std::move(state_manager),std::move(output_manager), std::move(twfs_manager),
+            std::move(termination_manager), std::move(tw_stats), fc_objects_per_cycle,
+            bind_order, initial_cpu);
     }
 
     if (comm_manager->getNumProcesses() > 1) {
