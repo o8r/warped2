@@ -286,16 +286,20 @@ void TimeWarpEventDispatcher::processEvents(unsigned int id) {
                 gvt = local_gvt_manager_->getGVT();
             }
 
-            // Fossil collect all queues for this object
-            twfs_manager_->fossilCollect(gvt, current_object_id);
-            output_manager_->fossilCollect(gvt, current_object_id);
+            if (gvt > current_object->last_fossil_collect_gvt_) {
+                current_object->last_fossil_collect_gvt_ = gvt;
 
-            unsigned int event_fossil_collect_time =
-                state_manager_->fossilCollect(gvt, current_object_id);
+                // Fossil collect all queues for this object
+                twfs_manager_->fossilCollect(gvt, current_object_id);
+                output_manager_->fossilCollect(gvt, current_object_id);
 
-            event_set_->acquireInputQueueLock(current_object_id);
-            event_set_->fossilCollect(event_fossil_collect_time, current_object_id);
-            event_set_->releaseInputQueueLock(current_object_id);
+                unsigned int event_fossil_collect_time =
+                    state_manager_->fossilCollect(gvt, current_object_id);
+
+                event_set_->acquireInputQueueLock(current_object_id);
+                event_set_->fossilCollect(event_fossil_collect_time, current_object_id);
+                event_set_->releaseInputQueueLock(current_object_id);
+            }
 
         } else {
             // This thread no longer has anything to do because it's schedule queue is empty.
