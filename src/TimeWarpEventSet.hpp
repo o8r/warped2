@@ -23,6 +23,7 @@ public:
 
     void initialize (unsigned int num_of_objects, 
                      unsigned int num_of_schedulers,
+                     bool is_lp_migration_on,
                      unsigned int num_of_worker_threads);
 
     void acquireInputQueueLock (unsigned int obj_id);
@@ -47,6 +48,8 @@ public:
     void replenishScheduler (unsigned int obj_id);
 
     void cancelEvent (unsigned int obj_id, std::shared_ptr<Event> cancel_event);
+
+    void printEvent (std::shared_ptr<Event> event);
 
     void fossilCollect (unsigned int fossil_collect_time, unsigned int obj_id);
 
@@ -77,6 +80,9 @@ private:
 
     // Map unprocessed queue to a schedule queue
     std::vector<unsigned int> input_queue_scheduler_map_;
+
+    // LP Migration flag
+    bool is_lp_migration_on_;
 
     // Map worker thread to a schedule queue
     std::vector<unsigned int> worker_thread_scheduler_map_;
