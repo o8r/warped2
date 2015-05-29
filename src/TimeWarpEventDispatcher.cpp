@@ -13,6 +13,11 @@
 #include <iostream>
 #include <cassert>
 
+#include <pthread.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <errno.h>
+
 #include "Event.hpp"
 #include "EventDispatcher.hpp"
 #include "LTSFQueue.hpp"
@@ -40,6 +45,7 @@ thread_local unsigned int TimeWarpEventDispatcher::thread_id;
 TimeWarpEventDispatcher::TimeWarpEventDispatcher(unsigned int max_sim_time,
     unsigned int num_worker_threads,
     unsigned int num_schedulers,
+    bool is_lp_migration_on,
     std::shared_ptr<TimeWarpCommunicationManager> comm_manager,
     std::unique_ptr<TimeWarpEventSet> event_set,
     std::unique_ptr<TimeWarpMatternGVTManager> mattern_gvt_manager,
@@ -48,25 +54,83 @@ TimeWarpEventDispatcher::TimeWarpEventDispatcher(unsigned int max_sim_time,
     std::unique_ptr<TimeWarpOutputManager> output_manager,
     std::unique_ptr<TimeWarpFileStreamManager> twfs_manager,
     std::unique_ptr<TimeWarpTerminationManager> termination_manager,
-    std::unique_ptr<TimeWarpStatistics> tw_stats) :
+    std::unique_ptr<TimeWarpStatistics> tw_stats,
+    BindOrder bind_order, unsigned int initial_cpu) :
         EventDispatcher(max_sim_time), num_worker_threads_(num_worker_threads),
-        num_schedulers_(num_schedulers), comm_manager_(comm_manager),
-        event_set_(std::move(event_set)), mattern_gvt_manager_(std::move(mattern_gvt_manager)),
+        num_schedulers_(num_schedulers), is_lp_migration_on_(is_lp_migration_on), 
+        comm_manager_(comm_manager), event_set_(std::move(event_set)), 
+        mattern_gvt_manager_(std::move(mattern_gvt_manager)),
         local_gvt_manager_(std::move(local_gvt_manager)), state_manager_(std::move(state_manager)),
         output_manager_(std::move(output_manager)), twfs_manager_(std::move(twfs_manager)),
-        termination_manager_(std::move(termination_manager)), tw_stats_(std::move(tw_stats)) {}
+        termination_manager_(std::move(termination_manager)), tw_stats_(std::move(tw_stats)),
+        bind_order_(bind_order), initial_cpu_(initial_cpu) {}
+
+void TimeWarpEventDispatcher::bindThread(pthread_t t, unsigned int thread_id) {
+    cpu_set_t cpuset;
+
+    CPU_ZERO(&cpuset);
+    if (bind_order_ == BindOrder::Ascending) {
+        CPU_SET(initial_cpu_ + thread_id, &cpuset);
+    } else if (bind_order_ == BindOrder::Descending) {
+        CPU_SET(initial_cpu_ - thread_id, &cpuset);
+    } else {
+        return;
+    }
+
+    int s = pthread_setaffinity_np(t, sizeof(cpu_set_t), &cpuset);
+    if (s != 0) {
+        std::cout << "Error: pthread_setaffinity_np" << std::endl;
+        std::exit(1);
+    }
+
+    s = pthread_getaffinity_np(t, sizeof(cpu_set_t), &cpuset);
+    if (s != 0) {
+        std::cout << "Error: pthread_getaffinity_np" << std::endl;
+        std::exit(1);
+    }
+
+    std::cout << "Thread " << thread_id << " affinity:";
+    for (unsigned int i = 0; i < CPU_SETSIZE; i++)
+        if (CPU_ISSET(i, &cpuset))
+           std::cout << " " << i;
+    std::cout << std::endl;
+}
 
 void TimeWarpEventDispatcher::startSimulation(const std::vector<std::vector<SimulationObject*>>&
                                               objects) {
     initialize(objects);
 
+    int fd = -1;
+
+    pid_t pid = getpid();
+    if ((fd = open("/cpusets/user/tasks", O_WRONLY, 0644)) < 0) {
+        std::cout << "Error: open: " << errno << std::endl;
+        std::exit(1);
+    }
+
+    char buf[8];
+    snprintf(buf, sizeof(buf), "%u", pid);
+    if (write(fd, buf, strlen(buf)) < 0) {
+        std::cout << "Error: write: " << errno << std::endl;
+        std::exit(1);
+    }
+
+    close(fd);
+
     // Create worker threads
     std::vector<std::thread> threads;
     for (unsigned int i = 0; i < num_worker_threads_; ++i) {
         auto thread(std::thread {&TimeWarpEventDispatcher::processEvents, this, i});
+
+        // Worker thread binding
+        bindThread(thread.native_handle(), i);
+
         thread.detach();
         threads.push_back(std::move(thread));
     }
+
+    // Manager thread binding
+    bindThread(pthread_self(), num_worker_threads_);
 
     unsigned int gvt = 0;
     auto sim_start = std::chrono::steady_clock::now();
@@ -409,7 +473,8 @@ TimeWarpEventDispatcher::initialize(const std::vector<std::vector<SimulationObje
     thread_id = num_worker_threads_;
 
     num_local_objects_ = objects[comm_manager_->getID()].size();
-    event_set_->initialize(num_local_objects_, num_schedulers_, num_worker_threads_);
+    event_set_->initialize(num_local_objects_, num_schedulers_, 
+                                    is_lp_migration_on_, num_worker_threads_);
 
     object_simulation_time_ = make_unique<unsigned int []>(num_local_objects_);
     std::memset(object_simulation_time_.get(), 0, num_local_objects_*sizeof(unsigned int));

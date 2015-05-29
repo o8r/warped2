@@ -38,9 +38,12 @@ enum class MatternColor;
 
 class TimeWarpEventDispatcher : public EventDispatcher {
 public:
+    enum class BindOrder { Ascending, Descending, None };
+
     TimeWarpEventDispatcher(unsigned int max_sim_time,
         unsigned int num_worker_threads,
         unsigned int num_schedulers,
+        bool is_lp_migration_on,
         std::shared_ptr<TimeWarpCommunicationManager> comm_manager,
         std::unique_ptr<TimeWarpEventSet> event_set,
         std::unique_ptr<TimeWarpMatternGVTManager> mattern_gvt_manager,
@@ -49,11 +52,14 @@ public:
         std::unique_ptr<TimeWarpOutputManager> output_manager,
         std::unique_ptr<TimeWarpFileStreamManager> twfs_manager,
         std::unique_ptr<TimeWarpTerminationManager> termination_manager,
-        std::unique_ptr<TimeWarpStatistics> tw_stats);
+        std::unique_ptr<TimeWarpStatistics> tw_stats,
+        BindOrder bind_order, unsigned int initial_cpu);
 
     void startSimulation(const std::vector<std::vector<SimulationObject*>>& objects);
 
 private:
+    void bindThread(pthread_t t, unsigned int thread_id);
+
     void sendEvents(std::vector<std::shared_ptr<Event>> new_events,
                     unsigned int sender_object_id, SimulationObject *sender_object);
 
@@ -85,6 +91,7 @@ private:
 
     unsigned int num_worker_threads_;
     unsigned int num_schedulers_;
+    bool is_lp_migration_on_;
     unsigned int num_local_objects_;
 
     std::unordered_map<std::string, SimulationObject*> objects_by_name_;
@@ -100,6 +107,10 @@ private:
     const std::unique_ptr<TimeWarpFileStreamManager> twfs_manager_;
     const std::unique_ptr<TimeWarpTerminationManager> termination_manager_;
     const std::unique_ptr<TimeWarpStatistics> tw_stats_;
+
+    BindOrder bind_order_;
+
+    unsigned int initial_cpu_;
 
     std::unique_ptr<unsigned int []> object_simulation_time_;
 
