@@ -273,12 +273,6 @@ void TimeWarpEventDispatcher::processEvents(unsigned int id) {
             // Send new events
             sendEvents(new_events, current_object_id, current_object);
 
-            // Move the next event from object into the schedule queue
-            // Also transfer old event to processed queue
-            event_set_->acquireInputQueueLock(current_object_id);
-            event_set_->replenishScheduler(current_object_id);
-            event_set_->releaseInputQueueLock(current_object_id);
-
             unsigned int gvt;
             if (comm_manager_->getNumProcesses() > 1) {
                 gvt = mattern_gvt_manager_->getGVT();
@@ -300,6 +294,12 @@ void TimeWarpEventDispatcher::processEvents(unsigned int id) {
                 event_set_->fossilCollect(event_fossil_collect_time, current_object_id);
                 event_set_->releaseInputQueueLock(current_object_id);
             }
+
+            // Move the next event from object into the schedule queue
+            // Also transfer old event to processed queue
+            event_set_->acquireInputQueueLock(current_object_id);
+            event_set_->replenishScheduler(current_object_id);
+            event_set_->releaseInputQueueLock(current_object_id);
 
         } else {
             // This thread no longer has anything to do because it's schedule queue is empty.
