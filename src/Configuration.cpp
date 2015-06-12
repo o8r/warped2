@@ -78,6 +78,9 @@ const static std::string DEFAULT_CONFIG = R"x({
         "initial-cpu" : 7
     },
 
+    // Name of file to dump stats, "none" to disable
+    "statistics-file" : "none",
+
     "communication" : {
         "send-queue-size" : 10000,
         "recv-queue-size" : 10000,
@@ -290,8 +293,9 @@ Configuration::makeDispatcher(std::shared_ptr<TimeWarpCommunicationManager> comm
             make_unique<TimeWarpFileStreamManager>();
 
         // STATISTICS
+        auto stats_file = (*root_)["time-warp"]["statistics-file"].asString();
         std::unique_ptr<TimeWarpStatistics> tw_stats =
-            make_unique<TimeWarpStatistics>(comm_manager);
+            make_unique<TimeWarpStatistics>(comm_manager, stats_file);
 
         // CORE BINDING
         unsigned int initial_cpu = (*root_)["time-warp"]["core-binding"]["initial-cpu"].asUInt();
