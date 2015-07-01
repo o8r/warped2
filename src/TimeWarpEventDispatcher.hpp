@@ -60,7 +60,7 @@ public:
 private:
     void bindThread(pthread_t t, unsigned int thread_id);
 
-    void sendEvents(std::vector<std::shared_ptr<Event>> new_events,
+    void sendEvents(std::shared_ptr<Event> source_event, std::vector<std::shared_ptr<Event>> new_events,
                     unsigned int sender_object_id, SimulationObject *sender_object);
 
     void sendLocalEvent(std::shared_ptr<Event> event);
@@ -111,8 +111,6 @@ private:
     unsigned int initial_cpu_;
 
     std::unique_ptr<unsigned int []> object_simulation_time_;
-
-    std::unique_ptr<std::atomic<unsigned long> []> event_counter_by_obj_;
 
     static thread_local unsigned int thread_id;
 };
