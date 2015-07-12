@@ -21,9 +21,27 @@ ProfileGuidedPartitioner::ProfileGuidedPartitioner(std::string stats_file)
     : stats_file_(stats_file) {}
 
 std::vector<std::vector<SimulationObject*>> ProfileGuidedPartitioner::partition(
-const std::vector<SimulationObject*>& objects, const unsigned int num_partitions) const {
+const std::vector<SimulationObject*>& objects, const unsigned int num_partitions,
+std::vector<float> part_weights) const {
+
     if (num_partitions == 1) {
         return {objects};
+    }
+
+    if (part_weights.empty()) {
+        part_weights.assign(num_partitions, (float)1.0/num_partitions);
+    } else {
+        if (part_weights.size() != num_partitions) {
+            throw std::runtime_error("The number of weights must equal the number of partitions!");
+        }
+
+        float weight_sum = 0.0;
+        for (auto& w : part_weights) {
+            weight_sum += w;
+        }
+        if (weight_sum != 1.0) {
+            throw std::runtime_error("The sum of partition weights must equal 1.0!");
+        }
     }
 
     std::ifstream input(stats_file_);
@@ -87,19 +105,19 @@ const std::vector<SimulationObject*>& objects, const unsigned int num_partitions
     }
     input.close();
 
-    METIS_PartGraphKway(&nvtxs,     // nvtxs
-                        &ncon,      // ncon
-                        &xadj[0],   // xadj
-                        &adjncy[0], // adjncy
-                        NULL,       // vwgt
-                        NULL,       // vsize
-                        &adjwgt[0], // adjwgt
-                        &nparts,    // nparts
-                        NULL,       // tpwgts
-                        NULL,       // ubvec
-                        NULL,        // options
-                        &edgecut,   // edgecut
-                        &part[0]    // part
+    METIS_PartGraphKway(&nvtxs,         // nvtxs
+                        &ncon,          // ncon
+                        &xadj[0],       // xadj
+                        &adjncy[0],     // adjncy
+                        NULL,           // vwgt
+                        NULL,           // vsize
+                        &adjwgt[0],     // adjwgt
+                        &nparts,        // nparts
+                        &part_weights[0],// tpwgts
+                        NULL,           // ubvec
+                        NULL,           // options
+                        &edgecut,       // edgecut
+                        &part[0]        // part
                        );
 
     // Create a map of all SimulationObject names -> pointers
