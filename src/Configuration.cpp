@@ -84,8 +84,6 @@ const static std::string DEFAULT_CONFIG = R"x({
     "config-output-file" : "none",
 
     "communication" : {
-        "send-queue-size" : 10000,
-        "recv-queue-size" : 10000,
         "max-buffer-size" : 512
     }
 },
@@ -346,7 +344,7 @@ check the following configurations:\n") + invalid_string);
         }
 
         return make_unique<TimeWarpEventDispatcher>(max_sim_time_,
-            num_worker_threads, num_schedulers, is_lp_migration_on, comm_manager,
+            num_worker_threads, is_lp_migration_on, comm_manager,
             std::move(event_set), std::move(mattern_gvt_manager), std::move(local_gvt_manager),
             std::move(state_manager),std::move(output_manager), std::move(twfs_manager),
             std::move(termination_manager), std::move(tw_stats), bind_order, initial_cpu);
@@ -402,13 +400,27 @@ Configuration::makePartitioner(std::unique_ptr<Partitioner> user_partitioner) {
     return makePartitioner();
 }
 
+std::unique_ptr<Partitioner> Configuration::makeLocalPartitioner(unsigned int node_id,
+    unsigned int& num_schedulers) {
+
+    if (num_schedulers == 1)
+        return makePartitioner();
+
+    num_schedulers = (*root_)["time-warp"]["scheduler-count"].asUInt();
+
+    auto partitioner_type = (*root_)["partitioning"]["type"].asString();
+    if (partitioner_type == "default" || partitioner_type == "round-robin") {
+        return make_unique<RoundRobinPartitioner>();
+    } else if (partitioner_type == "profile-guided") {
+        return make_unique<ProfileGuidedPartitioner>("partition"+std::to_string(node_id)+".out");
+    }
+    throw std::runtime_error(std::string("Invalid partitioning type: ") + partitioner_type);
+}
+
 std::shared_ptr<TimeWarpCommunicationManager> Configuration::makeCommunicationManager() {
-    unsigned int max_send_size = (*root_)["time-warp"]["communication"]["send-queue-size"].asUInt();
-    unsigned int max_recv_size = (*root_)["time-warp"]["communication"]["recv-queue-size"].asUInt();
     unsigned int max_buffer_size = (*root_)["time-warp"]["communication"]["max-buffer-size"].asUInt();
 
-    return std::make_shared<TimeWarpMPICommunicationManager>(max_send_size, max_recv_size,
-                                                             max_buffer_size);
+    return std::make_shared<TimeWarpMPICommunicationManager>(max_buffer_size);
 }
 
 } // namespace warped

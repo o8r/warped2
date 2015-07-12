@@ -42,7 +42,6 @@ public:
 
     TimeWarpEventDispatcher(unsigned int max_sim_time,
         unsigned int num_worker_threads,
-        unsigned int num_schedulers,
         bool is_lp_migration_on,
         std::shared_ptr<TimeWarpCommunicationManager> comm_manager,
         std::unique_ptr<TimeWarpEventSet> event_set,
@@ -88,13 +87,11 @@ private:
 /* ============================================================================ */
 
     unsigned int num_worker_threads_;
-    unsigned int num_schedulers_;
     bool is_lp_migration_on_;
     unsigned int num_local_objects_;
 
     std::unordered_map<std::string, SimulationObject*> objects_by_name_;
     std::unordered_map<std::string, unsigned int> local_object_id_by_name_;
-    std::unordered_map<std::string, unsigned int> object_node_id_by_name_;
 
     const std::shared_ptr<TimeWarpCommunicationManager> comm_manager_;
     const std::unique_ptr<TimeWarpEventSet> event_set_;

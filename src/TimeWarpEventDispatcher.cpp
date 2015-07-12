@@ -44,7 +44,6 @@ thread_local unsigned int TimeWarpEventDispatcher::thread_id;
 
 TimeWarpEventDispatcher::TimeWarpEventDispatcher(unsigned int max_sim_time,
     unsigned int num_worker_threads,
-    unsigned int num_schedulers,
     bool is_lp_migration_on,
     std::shared_ptr<TimeWarpCommunicationManager> comm_manager,
     std::unique_ptr<TimeWarpEventSet> event_set,
@@ -57,7 +56,7 @@ TimeWarpEventDispatcher::TimeWarpEventDispatcher(unsigned int max_sim_time,
     std::unique_ptr<TimeWarpStatistics> tw_stats,
     BindOrder bind_order, unsigned int initial_cpu) :
         EventDispatcher(max_sim_time), num_worker_threads_(num_worker_threads),
-        num_schedulers_(num_schedulers), is_lp_migration_on_(is_lp_migration_on), 
+        is_lp_migration_on_(is_lp_migration_on), 
         comm_manager_(comm_manager), event_set_(std::move(event_set)), 
         mattern_gvt_manager_(std::move(mattern_gvt_manager)),
         local_gvt_manager_(std::move(local_gvt_manager)), state_manager_(std::move(state_manager)),
@@ -138,15 +137,12 @@ void TimeWarpEventDispatcher::startSimulation(const std::vector<std::vector<Simu
     // Master thread main loop
     while (!termination_manager_->terminationStatus()) {
 
-        comm_manager_->deliverReceivedMessages();
         comm_manager_->sendMessages();
+        comm_manager_->deliverReceivedMessages();
 
-        // We can start a "local GVT calculation" two different ways
-        //      1. We are the master node and it is time to start a new "global GVT calculation"
-        //      2. We have received a Mattern token and a local minimum time is needed so the
-        //          token can be forwarded to next node.
-        if (mattern_gvt_manager_->startGVT() || mattern_gvt_manager_->needLocalGVT()) {
-            local_gvt_manager_->startGVT();
+        // Check to see if we should start/continue the termination process
+        if (termination_manager_->nodePassive()) {
+            termination_manager_->sendTerminationToken(State::PASSIVE, comm_manager_->getID());
         }
 
         // Check to see if a "local GVT calculation" has completed so we can forward a Mattern
@@ -158,7 +154,6 @@ void TimeWarpEventDispatcher::startSimulation(const std::vector<std::vector<Simu
                 gvt = local_gvt_manager_->getGVT();
                 std::cout << "GVT: " << gvt << std::endl;
                 tw_stats_->upCount(GVT_CYCLES, num_worker_threads_);
-                mattern_gvt_manager_->resetState();
             }
         }
 
@@ -170,13 +165,16 @@ void TimeWarpEventDispatcher::startSimulation(const std::vector<std::vector<Simu
                 std::cout << "GVT: " << gvt << std::endl;
             }
             tw_stats_->upCount(GVT_CYCLES, num_worker_threads_);
-            mattern_gvt_manager_->resetState();
         }
 
-        // Check to see if we should start/continue the termination process
-        if (termination_manager_->nodePassive()) {
-            termination_manager_->sendTerminationToken(State::PASSIVE, comm_manager_->getID());
+        // We can start a "local GVT calculation" two different ways
+        //      1. We are the master node and it is time to start a new "global GVT calculation"
+        //      2. We have received a Mattern token and a local minimum time is needed so the
+        //          token can be forwarded to next node.
+        if (mattern_gvt_manager_->startGVT() || mattern_gvt_manager_->needLocalGVT()) {
+            local_gvt_manager_->startGVT();
         }
+
     }
 
     comm_manager_->waitForAllProcesses();
@@ -223,7 +221,7 @@ void TimeWarpEventDispatcher::processEvents(unsigned int id) {
                 termination_manager_->setThreadActive(thread_id);
             }
 
-            assert(object_node_id_by_name_[event->receiverName()] == comm_manager_->getID());
+            assert(comm_manager_->getNodeID(event->receiverName()) == comm_manager_->getID());
             unsigned int current_object_id = local_object_id_by_name_[event->receiverName()];
             SimulationObject* current_object = objects_by_name_[event->receiverName()];
 
@@ -332,6 +330,8 @@ void TimeWarpEventDispatcher::receiveEventMessage(std::unique_ptr<TimeWarpKernel
     assert(msg->event != nullptr);
 
     sendLocalEvent(msg->event);
+
+    mattern_gvt_manager_->receiveUpdate(msg->gvt_mattern_color);
 }
 
 void TimeWarpEventDispatcher::sendEvents(std::shared_ptr<Event> source_event,
@@ -353,7 +353,7 @@ void TimeWarpEventDispatcher::sendEvents(std::shared_ptr<Event> source_event,
             //  with the model being run.
             assert(e->timestamp() >= object_simulation_time_[sender_object_id]);
 
-            unsigned int node_id = object_node_id_by_name_[e->receiverName()];
+            unsigned int node_id = comm_manager_->getNodeID(e->receiverName());
             if (node_id == comm_manager_->getID()) {
                 // Local event
                 sendLocalEvent(e);
@@ -397,7 +397,7 @@ void TimeWarpEventDispatcher::cancelEvents(
         // Make sure not to send any events past max time so that events can be exhausted and we
         // can terminate the simulation.
         if (event->timestamp() <= max_sim_time_) {
-            unsigned int receiver_node_id = object_node_id_by_name_[event->receiverName()];
+            unsigned int receiver_node_id = comm_manager_->getNodeID(event->receiverName());
             if (receiver_node_id == comm_manager_->getID()) {
                 sendLocalEvent(neg_event);
                 tw_stats_->upCount(LOCAL_NEGATIVE_EVENTS_SENT, thread_id);
@@ -487,25 +487,23 @@ TimeWarpEventDispatcher::initialize(const std::vector<std::vector<SimulationObje
 
     thread_id = num_worker_threads_;
 
-    num_local_objects_ = objects[comm_manager_->getID()].size();
-    event_set_->initialize(num_local_objects_, num_schedulers_, 
-                                    is_lp_migration_on_, num_worker_threads_);
+    num_local_objects_ = 0;
+    for (auto& p: objects) {
+        num_local_objects_ += p.size();
+    }
+
+    event_set_->initialize(objects, num_local_objects_, is_lp_migration_on_, num_worker_threads_);
 
     object_simulation_time_ = make_unique<unsigned int []>(num_local_objects_);
     std::memset(object_simulation_time_.get(), 0, num_local_objects_*sizeof(unsigned int));
 
-    unsigned int partition_id = 0;
+    unsigned int object_id = 0;
     for (auto& partition : objects) {
-        unsigned int object_id = 0;
         for (auto& ob : partition) {
-            if (partition_id == comm_manager_->getID()) {
-                objects_by_name_[ob->name_] = ob;
-                local_object_id_by_name_[ob->name_] = object_id;
-                object_id++;
-            }
-            object_node_id_by_name_[ob->name_] = partition_id;
+            objects_by_name_[ob->name_] = ob;
+            local_object_id_by_name_[ob->name_] = object_id;
+            object_id++;
         }
-        partition_id++;
     }
 
     // Creates the state queues, output queues, and filestream queues for each local object
@@ -526,17 +524,13 @@ TimeWarpEventDispatcher::initialize(const std::vector<std::vector<SimulationObje
 
     // Send local initial events and enqueue remote initial events
     auto initial_event = std::make_shared<InitialEvent>();
-    partition_id = 0;
     for (auto& partition : objects) {
-        if (partition_id == comm_manager_->getID()) {
-            for (auto& ob : partition) {
-                unsigned int object_id = local_object_id_by_name_[ob->name_];
-                auto new_events = ob->initializeObject();
-                sendEvents(initial_event, new_events, object_id, ob);
-                state_manager_->saveState(initial_event, object_id, ob);
-            }
+        for (auto& ob : partition) {
+            unsigned int object_id = local_object_id_by_name_[ob->name_];
+            auto new_events = ob->initializeObject();
+            sendEvents(initial_event, new_events, object_id, ob);
+            state_manager_->saveState(initial_event, object_id, ob);
         }
-        partition_id++;
     }
 
     // Send and receive remote initial events
@@ -563,10 +557,8 @@ void TimeWarpEventDispatcher::enqueueRemoteEvent(std::shared_ptr<Event> event,
     unsigned int receiver_id) {
 
     if (event->timestamp() <= max_sim_time_) {
-        MatternNodeState::lock_.lock();
-        auto event_msg = make_unique<EventMessage>(comm_manager_->getID(), receiver_id, event,
-                                                   MatternNodeState::color_);
-        MatternNodeState::lock_.unlock();
+        auto color = mattern_gvt_manager_->sendUpdate(event->timestamp());
+        auto event_msg = make_unique<EventMessage>(comm_manager_->getID(), receiver_id, event, color);
         comm_manager_->insertMessage(std::move(event_msg));
     }
 }

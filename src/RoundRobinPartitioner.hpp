@@ -13,7 +13,8 @@ class RoundRobinPartitioner : public Partitioner {
 public:
     std::vector<std::vector<SimulationObject*>> partition(
              const std::vector<SimulationObject*>& objects,
-             const unsigned int num_partitions) const;
+             const unsigned int num_partitions,
+             std::vector<float> part_weights = {}) const;
 };
 
 } // namespace warped
