@@ -19,8 +19,7 @@ public:
 
     std::vector<std::vector<SimulationObject*>> partition(
              const std::vector<SimulationObject*>& objects,
-             const unsigned int num_partitions,
-             std::vector<float> part_weights = {}) const;
+             const unsigned int num_partitions) const;
 
 protected:
     void savePartition(unsigned int part_id,

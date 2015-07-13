@@ -65,9 +65,13 @@ const static std::string DEFAULT_CONFIG = R"x({
 
     "cancellation": "aggressive",
 
-    "worker-threads": 3,
+    "big-worker-threads": 4,
+    "little-worker-threads": 2,
 
-    "scheduler-count": 1,
+    "big-scheduler-count": 2,
+    "little-scheduler-count": 1,
+
+    "big-object-percent": 0.64,
 
     // LP Migration valid options are "on" and "off"
     "lp-migration": "off",
@@ -222,15 +226,24 @@ Configuration::makeDispatcher(std::shared_ptr<TimeWarpCommunicationManager> comm
         std::unique_ptr<TimeWarpEventSet> event_set = make_unique<TimeWarpEventSet>();
 
         // WORKER THREADS
-        int num_worker_threads = (*root_)["time-warp"]["worker-threads"].asInt();
-        if (!checkTimeWarpConfigs(num_worker_threads, all_config_ids, comm_manager)) {
-            invalid_string += std::string("\tNumber of worker threads\n");
+        int big_worker_threads = (*root_)["time-warp"]["big-worker-threads"].asInt();
+        if (!checkTimeWarpConfigs(big_worker_threads, all_config_ids, comm_manager)) {
+            invalid_string += std::string("\tNumber of big worker threads\n");
+        }
+
+        int little_worker_threads = (*root_)["time-warp"]["little-worker-threads"].asInt();
+        if (!checkTimeWarpConfigs(little_worker_threads, all_config_ids, comm_manager)) {
+            invalid_string += std::string("\tNumber of little worker threads\n");
         }
 
         // SCHEDULE QUEUES
-        int num_schedulers = (*root_)["time-warp"]["scheduler-count"].asInt();
-        if (!checkTimeWarpConfigs(num_schedulers, all_config_ids, comm_manager)) {
-            invalid_string += std::string("\tNumber of schedule queues\n");
+        int big_schedulers = (*root_)["time-warp"]["big-scheduler-count"].asInt();
+        if (!checkTimeWarpConfigs(big_schedulers, all_config_ids, comm_manager)) {
+            invalid_string += std::string("\tNumber of big schedule queues\n");
+        }
+        int little_schedulers = (*root_)["time-warp"]["little-scheduler-count"].asInt();
+        if (!checkTimeWarpConfigs(little_schedulers, all_config_ids, comm_manager)) {
+            invalid_string += std::string("\tNumber of little schedule queues\n");
         }
 
         // LP MIGRATION
@@ -322,17 +335,19 @@ check the following configurations:\n") + invalid_string);
 #else
             std::cout << "\nDEBUG BUILD\n" << std::endl;
 #endif
-            std::cout << "Simulation type:           " << simulation_type << "\n"
-                      << "Number of processes:       " << comm_manager->getNumProcesses() << "\n"
-                      << "Number of worker threads:  " << num_worker_threads << "\n"
-                      << "Number of Schedule queues: " << num_schedulers << "\n"
-                      << "LP Migration:              " << lp_migration_status << "\n"
-                      << "State-saving type:         " << state_saving_type << "\n";
+            std::cout << "Simulation type:                  " << simulation_type << "\n"
+                      << "Number of processes:              " << comm_manager->getNumProcesses() << "\n"
+                      << "Number of big worker threads:     " << big_worker_threads << "\n"
+                      << "Number of LITTLE worker threads:  " << little_worker_threads << "\n"
+                      << "Number of big schedule queues:    " << big_schedulers << "\n"
+                      << "Number of LITTLE schedule queues: " << little_schedulers << "\n"
+                      << "LP Migration:                     " << lp_migration_status << "\n"
+                      << "State-saving type:                " << state_saving_type << "\n";
             if (state_saving_type == "periodic")
-            std::cout << "State-saving period:       " << state_period << " events" << "\n";
-            std::cout << "Cancellation type:         " << cancellation_type << "\n"
-                      << "GVT Period:                " << gvt_period << " ms" << "\n"
-                      << "Max simulation time:       " \
+            std::cout << "State-saving period:              " << state_period << " events" << "\n";
+            std::cout << "Cancellation type:                " << cancellation_type << "\n"
+                      << "GVT Period:                       " << gvt_period << " ms" << "\n"
+                      << "Max simulation time:              " \
                         << (max_sim_time_ ? std::to_string(max_sim_time_) : "infinity") << std::endl << std::endl;
 
             auto output_config_file = (*root_)["time-warp"]["config-output-file"].asString();
@@ -344,7 +359,7 @@ check the following configurations:\n") + invalid_string);
         }
 
         return make_unique<TimeWarpEventDispatcher>(max_sim_time_,
-            num_worker_threads, is_lp_migration_on, comm_manager,
+            (big_worker_threads+little_worker_threads), is_lp_migration_on, comm_manager,
             std::move(event_set), std::move(mattern_gvt_manager), std::move(local_gvt_manager),
             std::move(state_manager),std::move(output_manager), std::move(twfs_manager),
             std::move(termination_manager), std::move(tw_stats), bind_order, initial_cpu);
@@ -403,16 +418,32 @@ Configuration::makePartitioner(std::unique_ptr<Partitioner> user_partitioner) {
 std::unique_ptr<Partitioner> Configuration::makeLocalPartitioner(unsigned int node_id,
     unsigned int& num_schedulers) {
 
-    if (num_schedulers == 1)
-        return makePartitioner();
+    unsigned int big_schedulers = (*root_)["time-warp"]["big-scheduler-count"].asUInt();
+    unsigned int little_schedulers = (*root_)["time-warp"]["little-scheduler-count"].asUInt();
+    float big_object_percent = (*root_)["time-warp"]["big-object-percent"].asFloat();
 
-    num_schedulers = (*root_)["time-warp"]["scheduler-count"].asUInt();
+    std::vector<float> weights;
+    for (unsigned int i = 0; i < big_schedulers; i++) {
+        weights.push_back(big_object_percent/big_schedulers);
+    }
+    for (unsigned int i = 0; i < little_schedulers; i++) {
+        weights.push_back((1-big_object_percent)/little_schedulers);
+    }
 
     auto partitioner_type = (*root_)["partitioning"]["type"].asString();
     if (partitioner_type == "default" || partitioner_type == "round-robin") {
-        return make_unique<RoundRobinPartitioner>();
+        num_schedulers = big_schedulers + little_schedulers;
+        return make_unique<RoundRobinPartitioner>(weights);
     } else if (partitioner_type == "profile-guided") {
-        return make_unique<ProfileGuidedPartitioner>("partition"+std::to_string(node_id)+".out");
+        if (num_schedulers == 1) {
+            num_schedulers = big_schedulers + little_schedulers;
+            auto filename = (*root_)["partitioning"]["file"].asString();
+            return make_unique<ProfileGuidedPartitioner>(filename, weights);
+        } else {
+            num_schedulers = big_schedulers + little_schedulers;
+            return make_unique<ProfileGuidedPartitioner>(
+                "partition"+std::to_string(node_id)+".out", weights);
+        }
     }
     throw std::runtime_error(std::string("Invalid partitioning type: ") + partitioner_type);
 }
