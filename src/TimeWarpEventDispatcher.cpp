@@ -132,6 +132,7 @@ void TimeWarpEventDispatcher::startSimulation(const std::vector<std::vector<Simu
     bindThread(pthread_self(), num_worker_threads_);
 
     unsigned int gvt = 0;
+    bool gvt_in_progress = false;
     auto sim_start = std::chrono::steady_clock::now();
 
     // Master thread main loop
@@ -154,6 +155,7 @@ void TimeWarpEventDispatcher::startSimulation(const std::vector<std::vector<Simu
                 gvt = local_gvt_manager_->getGVT();
                 std::cout << "GVT: " << gvt << std::endl;
                 tw_stats_->upCount(GVT_CYCLES, num_worker_threads_);
+                gvt_in_progress = false;
             }
         }
 
@@ -165,14 +167,17 @@ void TimeWarpEventDispatcher::startSimulation(const std::vector<std::vector<Simu
                 std::cout << "GVT: " << gvt << std::endl;
             }
             tw_stats_->upCount(GVT_CYCLES, num_worker_threads_);
+            gvt_in_progress = false;
         }
 
         // We can start a "local GVT calculation" two different ways
         //      1. We are the master node and it is time to start a new "global GVT calculation"
         //      2. We have received a Mattern token and a local minimum time is needed so the
         //          token can be forwarded to next node.
-        if (mattern_gvt_manager_->startGVT() || mattern_gvt_manager_->needLocalGVT()) {
+        if ((!gvt_in_progress) &&
+            (mattern_gvt_manager_->startGVT() || mattern_gvt_manager_->needLocalGVT())) {
             local_gvt_manager_->startGVT();
+            gvt_in_progress = true;
         }
 
     }
