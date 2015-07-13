@@ -17,26 +17,25 @@
 
 namespace warped {
 
-ProfileGuidedPartitioner::ProfileGuidedPartitioner(std::string stats_file)
-    : stats_file_(stats_file) {}
+ProfileGuidedPartitioner::ProfileGuidedPartitioner(std::string stats_file,
+    std::vector<float> part_weights) : stats_file_(stats_file), part_weights_(part_weights) {}
 
 std::vector<std::vector<SimulationObject*>> ProfileGuidedPartitioner::partition(
-const std::vector<SimulationObject*>& objects, const unsigned int num_partitions,
-std::vector<float> part_weights) const {
+const std::vector<SimulationObject*>& objects, const unsigned int num_partitions) const {
 
     if (num_partitions == 1) {
         return {objects};
     }
 
-    if (part_weights.empty()) {
-        part_weights.assign(num_partitions, (float)1.0/num_partitions);
+    if (part_weights_.empty()) {
+        part_weights_.assign(num_partitions, (float)1.0/num_partitions);
     } else {
-        if (part_weights.size() != num_partitions) {
+        if (part_weights_.size() != num_partitions) {
             throw std::runtime_error("The number of weights must equal the number of partitions!");
         }
 
         float weight_sum = 0.0;
-        for (auto& w : part_weights) {
+        for (auto& w : part_weights_) {
             weight_sum += w;
         }
         if (weight_sum != 1.0) {
@@ -113,7 +112,7 @@ std::vector<float> part_weights) const {
                         NULL,           // vsize
                         &adjwgt[0],     // adjwgt
                         &nparts,        // nparts
-                        &part_weights[0],// tpwgts
+                        &part_weights_[0],// tpwgts
                         NULL,           // ubvec
                         NULL,           // options
                         &edgecut,       // edgecut

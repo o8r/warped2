@@ -15,7 +15,7 @@ class SimulationObject;
 
 class ProfileGuidedPartitioner : public Partitioner {
 public:
-    ProfileGuidedPartitioner(std::string stats_file);
+    ProfileGuidedPartitioner(std::string stats_file, std::vector<float> part_weights = {});
 
     std::vector<std::vector<SimulationObject*>> partition(
              const std::vector<SimulationObject*>& objects,
@@ -32,6 +32,8 @@ protected:
 
 private:
     std::string stats_file_;
+
+    mutable std::vector<float> part_weights_;
 };
 
 } // namespace warped
