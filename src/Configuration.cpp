@@ -418,6 +418,12 @@ Configuration::makePartitioner(std::unique_ptr<Partitioner> user_partitioner) {
 std::unique_ptr<Partitioner> Configuration::makeLocalPartitioner(unsigned int node_id,
     unsigned int& num_schedulers) {
 
+    auto simulation_type = (*root_)["simulation-type"].asString();
+    if (simulation_type == "sequential") {
+        num_schedulers = 1;
+        return make_unique<RoundRobinPartitioner>();
+    }
+
     unsigned int big_schedulers = (*root_)["time-warp"]["big-scheduler-count"].asUInt();
     unsigned int little_schedulers = (*root_)["time-warp"]["little-scheduler-count"].asUInt();
     float big_object_percent = (*root_)["time-warp"]["big-object-percent"].asFloat();
