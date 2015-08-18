@@ -42,9 +42,11 @@ namespace warped {
 
 thread_local unsigned int TimeWarpEventDispatcher::thread_id;
 
-TimeWarpEventDispatcher::TimeWarpEventDispatcher(unsigned int max_sim_time,
+TimeWarpEventDispatcher::TimeWarpEventDispatcher(
+    unsigned int max_sim_time,
     unsigned int num_worker_threads,
     bool is_lp_migration_on,
+    unsigned int set_size,
     std::shared_ptr<TimeWarpCommunicationManager> comm_manager,
     std::unique_ptr<TimeWarpEventSet> event_set,
     std::unique_ptr<TimeWarpMatternGVTManager> mattern_gvt_manager,
@@ -55,7 +57,7 @@ TimeWarpEventDispatcher::TimeWarpEventDispatcher(unsigned int max_sim_time,
     std::unique_ptr<TimeWarpTerminationManager> termination_manager,
     std::unique_ptr<TimeWarpStatistics> tw_stats) :
         EventDispatcher(max_sim_time), num_worker_threads_(num_worker_threads),
-        is_lp_migration_on_(is_lp_migration_on), 
+        is_lp_migration_on_(is_lp_migration_on), set_size_(set_size), 
         comm_manager_(comm_manager), event_set_(std::move(event_set)), 
         mattern_gvt_manager_(std::move(mattern_gvt_manager)),
         local_gvt_manager_(std::move(local_gvt_manager)), state_manager_(std::move(state_manager)),
@@ -152,122 +154,129 @@ void TimeWarpEventDispatcher::processEvents(unsigned int id) {
     unsigned int gvt = 0;
 
     while (!termination_manager_->terminationStatus()) {
-        // NOTE: local_gvt_flag must be obtained before getting the next event to avoid the
-        //  "simultaneous reporting problem"
-        local_gvt_flag = local_gvt_manager_->getLocalGVTFlag();
 
-        std::shared_ptr<Event> event = event_set_->getEvent(thread_id);
-        if (event != nullptr) {
+        auto event_list = event_set_->getEvent(thread_id, set_size_);
+        for (auto event : event_list) {
+            // NOTE: local_gvt_flag must be obtained before getting the next event 
+            //  to avoid the "simultaneous reporting problem"
+            local_gvt_flag = local_gvt_manager_->getLocalGVTFlag();
 
-            // Make sure that if this thread is currently seen as passive, we update it's state
-            //  so we don't terminate early.
-            if (termination_manager_->threadPassive(thread_id)) {
-                termination_manager_->setThreadActive(thread_id);
-            }
+            if (event != nullptr) {
 
-            assert(comm_manager_->getNodeID(event->receiverName()) == comm_manager_->getID());
-            unsigned int current_lp_id = local_lp_id_by_name_[event->receiverName()];
-            LogicalProcess* current_lp = lps_by_name_[event->receiverName()];
+                // Make sure that if this thread is currently seen as passive, 
+                //  we update it's state so we don't terminate early.
+                if (termination_manager_->threadPassive(thread_id)) {
+                    termination_manager_->setThreadActive(thread_id);
+                }
 
-            // Get the last processed event so we can check for a rollback
-            auto last_processed_event = event_set_->lastProcessedEvent(current_lp_id);
+                assert(comm_manager_->getNodeID(event->receiverName()) == comm_manager_->getID());
+                unsigned int current_lp_id = local_lp_id_by_name_[event->receiverName()];
+                LogicalProcess* current_lp = lps_by_name_[event->receiverName()];
 
-            // The rules with event processing
-            //      1. Negative events are given priority over positive events if they both exist
-            //          in the lps input queue
-            //      2. We assume that if we have a negative message, then we also have the positive
-            //          message either in the input queue or in the processed queue. If the positive
-            //          event is in the processed queue, then a rollback will occur and both events
-            //          will end up in the input queue.
-            //      3. When a negative event is taken from the schedule queue, it will be cancelled
-            //          with it's corresponding negative message in the input queue. A rollback
-            //          may occur first.
-            //      4. When a positive event is taken from the schedule queue, it will always be
-            //          processed. A rollback may occur first if it is a straggler.
+                // Get the last processed event so we can check for a rollback
+                auto last_processed_event = event_set_->lastProcessedEvent(current_lp_id);
 
-            // A rollback can occur in two situations:
-            //      1. We get an event that is strictly less than the last processed event.
-            //      2. We get an event that is equal to the last processed event and is negative.
+                // The rules with event processing
+                //      1. Negative events are given priority over positive events if they 
+                //          both exist in the lps input queue
+                //      2. We assume that if we have a negative message, then we also have 
+                //          the positive message either in the input queue or in the processed 
+                //          queue. If the positive event is in the processed queue, then a 
+                //          rollback will occur and both events will end up in the input queue.
+                //      3. When a negative event is taken from the schedule queue, it will 
+                //          be cancelled with it's corresponding negative message in the input 
+                //          queue. A rollback may occur first.
+                //      4. When a positive event is taken from the schedule queue, it will 
+                //          always be processed. A rollback may occur first if it is a 
+                //          straggler.
 
-            if (last_processed_event &&
-                    ((*event < *last_processed_event) ||
-                        ((*event == *last_processed_event) &&
-                         (event->event_type_ == EventType::NEGATIVE)))) {
-                rollback(event);
-            }
+                // A rollback can occur in two situations:
+                //      1. We get an event that is strictly less than the last processed 
+                //          event.
+                //      2. We get an event that is equal to the last processed event and 
+                //          is negative.
 
-            // Check to see if event is NEGATIVE and cancel
-            if (event->event_type_ == EventType::NEGATIVE) {
-                event_set_->acquireInputQueueLock(current_lp_id);
-                event_set_->cancelEvent(current_lp_id, event);
-                event_set_->startScheduling(current_lp_id);
-                event_set_->releaseInputQueueLock(current_lp_id);
+                if (last_processed_event &&
+                        ((*event < *last_processed_event) ||
+                            ((*event == *last_processed_event) &&
+                             (event->event_type_ == EventType::NEGATIVE)))) {
+                    rollback(event);
+                }
 
-                tw_stats_->upCount(CANCELLED_EVENTS, thread_id);
-                continue;
-            }
+                // Check to see if event is NEGATIVE and cancel
+                if (event->event_type_ == EventType::NEGATIVE) {
+                    event_set_->acquireInputQueueLock(current_lp_id);
+                    event_set_->cancelEvent(current_lp_id, event);
+                    event_set_->startScheduling(current_lp_id);
+                    event_set_->releaseInputQueueLock(current_lp_id);
 
-            // If needed, report event for this thread so GVT can be calculated
-            auto lowest_timestamp = event->timestamp();
+                    tw_stats_->upCount(CANCELLED_EVENTS, thread_id);
+                    continue;
+                }
+
+                // If needed, report event for this thread so GVT can be calculated
+                auto lowest_timestamp = event->timestamp();
 
 #if LADDER_QUEUE_SCHEDULER
 #if PARTIALLY_UNSORTED_EVENT_SET
-            lowest_timestamp = event_set_->lowestTimestamp(thread_id);
+                lowest_timestamp = event_set_->lowestTimestamp(thread_id);
 #endif
 #endif
 
-            local_gvt_manager_->receiveEventUpdateState(
-                    lowest_timestamp, thread_id, local_gvt_flag);
+                local_gvt_manager_->receiveEventUpdateState(
+                        lowest_timestamp, thread_id, local_gvt_flag);
 
-            // process event and get new events
-            auto new_events = current_lp->receiveEvent(*event);
+                // process event and get new events
+                auto new_events = current_lp->receiveEvent(*event);
 
-            tw_stats_->upCount(EVENTS_PROCESSED, thread_id);
+                tw_stats_->upCount(EVENTS_PROCESSED, thread_id);
 
-            // Save state
-            state_manager_->saveState(event, current_lp_id, current_lp);
+                // Save state
+                state_manager_->saveState(event, current_lp_id, current_lp);
 
-            // Send new events
-            sendEvents(event, new_events, current_lp_id, current_lp);
+                // Send new events
+                sendEvents(event, new_events, current_lp_id, current_lp);
 
-            if (comm_manager_->getNumProcesses() > 1) {
-                gvt = mattern_gvt_manager_->getGVT();
+                if (comm_manager_->getNumProcesses() > 1) {
+                    gvt = mattern_gvt_manager_->getGVT();
+                } else {
+                    gvt = local_gvt_manager_->getGVT();
+                }
+
+                if (gvt > current_lp->last_fossil_collect_gvt_) {
+                    current_lp->last_fossil_collect_gvt_ = gvt;
+
+                    // Fossil collect all queues for this lp
+                    twfs_manager_->fossilCollect(gvt, current_lp_id);
+                    output_manager_->fossilCollect(gvt, current_lp_id);
+
+                    unsigned int event_fossil_collect_time =
+                        state_manager_->fossilCollect(gvt, current_lp_id);
+
+                    unsigned int num_committed =
+                        event_set_->fossilCollect(event_fossil_collect_time, current_lp_id);
+
+                    tw_stats_->upCount(EVENTS_COMMITTED, thread_id, num_committed);
+                }
+
+                // Move the next event from lp into the schedule queue
+                // Also transfer old event to processed queue
+                event_set_->acquireInputQueueLock(current_lp_id);
+                event_set_->replenishScheduler(current_lp_id);
+                event_set_->releaseInputQueueLock(current_lp_id);
+
             } else {
-                gvt = local_gvt_manager_->getGVT();
+                // This thread no longer has anything to do because 
+                // it's schedule queue is empty.
+                if (!termination_manager_->threadPassive(thread_id)) {
+                    termination_manager_->setThreadPassive(thread_id);
+                }
+
+                // We must have this so that the GVT calculations can 
+                // continue with passive threads. Just report infinite for a time.
+                local_gvt_manager_->receiveEventUpdateState((unsigned int)-1,
+                                                        thread_id, local_gvt_flag);
             }
-
-            if (gvt > current_lp->last_fossil_collect_gvt_) {
-                current_lp->last_fossil_collect_gvt_ = gvt;
-
-                // Fossil collect all queues for this lp
-                twfs_manager_->fossilCollect(gvt, current_lp_id);
-                output_manager_->fossilCollect(gvt, current_lp_id);
-
-                unsigned int event_fossil_collect_time =
-                    state_manager_->fossilCollect(gvt, current_lp_id);
-
-                unsigned int num_committed =
-                    event_set_->fossilCollect(event_fossil_collect_time, current_lp_id);
-
-                tw_stats_->upCount(EVENTS_COMMITTED, thread_id, num_committed);
-            }
-
-            // Move the next event from lp into the schedule queue
-            // Also transfer old event to processed queue
-            event_set_->acquireInputQueueLock(current_lp_id);
-            event_set_->replenishScheduler(current_lp_id);
-            event_set_->releaseInputQueueLock(current_lp_id);
-
-        } else {
-            // This thread no longer has anything to do because it's schedule queue is empty.
-            if (!termination_manager_->threadPassive(thread_id)) {
-                termination_manager_->setThreadPassive(thread_id);
-            }
-
-            // We must have this so that the GVT calculations can continue with passive threads.
-            // Just report infinite for a time.
-            local_gvt_manager_->receiveEventUpdateState((unsigned int)-1,
-                thread_id, local_gvt_flag);
         }
     }
 }
