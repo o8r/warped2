@@ -19,7 +19,9 @@ LadderQueue::LadderQueue() {
     }
 }
 
-std::shared_ptr<Event> LadderQueue::begin() {
+std::shared_ptr<Event> LadderQueue::begin(unsigned int count) {
+
+    std::cout << count << std::endl;
 
     /* Remove from bottom if not empty */
     if (!bottom_.empty()) {

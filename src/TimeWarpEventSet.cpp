@@ -12,18 +12,20 @@ void TimeWarpEventSet::initialize (const std::vector<std::vector<LogicalProcess*
                                    bool is_lp_migration_on,
                                    unsigned int num_of_worker_threads) {
 
-    num_of_lps_     = num_of_lps;
+    num_of_lps_         = num_of_lps;
     num_of_schedulers_  = lps.size();
     is_lp_migration_on_ = is_lp_migration_on;
 
     /* Create the input and processed queues and their locks.
        Also create the input queue-scheduler map and scheduled event pointer. */
     input_queue_lock_ = make_unique<std::mutex []>(num_of_lps);
+
 #ifdef SCHEDULE_QUEUE_SPINLOCKS
     schedule_queue_lock_ = make_unique<TicketLock []>(num_of_schedulers_);
 #else
     schedule_queue_lock_ = make_unique<std::mutex []>(num_of_schedulers_);
 #endif
+
     unsigned int scheduler_id = 0;
     for (auto& scheduler_partition : lps) {
         for (auto& lp : scheduler_partition) {
@@ -76,9 +78,9 @@ void TimeWarpEventSet::insertEvent (unsigned int lp_id, std::shared_ptr<Event> e
     unsigned int scheduler_id = input_queue_scheduler_map_[lp_id];
 
     if (scheduled_event_pointer_[lp_id] == nullptr) {
-        // If no event is currently scheduled. This can only happen if the thread that handles events
-        // for lp with id lp_id has determined that there are no more events left in it's input
-        // queue
+        // If no event is currently scheduled. This can only happen if the thread that 
+        // handles events for lp with id lp_id has determined that there are no more 
+        // events left in it's input queue
 
         assert(input_queue_[lp_id]->size() == 1);
 
@@ -91,16 +93,15 @@ void TimeWarpEventSet::insertEvent (unsigned int lp_id, std::shared_ptr<Event> e
         auto smallest_event = *input_queue_[lp_id]->begin();
 
         if (smallest_event != scheduled_event_pointer_[lp_id]) {
-            // If the pointer comparison of the smallest event does not match scheduled event, well
-            // that means we should update the schedule queue...
+            // If the pointer comparison of the smallest event does not match scheduled event, 
+            // well that means we should update the schedule queue...
 
             schedule_queue_lock_[scheduler_id].lock();
-            if (auto num_erased = schedule_queue_[scheduler_id]->erase(scheduled_event_pointer_[lp_id])) {
-                // ...but only if the event was successfully erased from the schedule queue. If it is
-                // not then the event is already being processed and a rollback will have to occur.
-
-                assert(num_erased == 1);
-                unused(num_erased);
+            auto success = schedule_queue_[scheduler_id]->erase(scheduled_event_pointer_[lp_id]);
+            if (success) {
+                // ...but only if the event was successfully erased from the schedule queue. 
+                // If it is not then the event is already being processed and a rollback will 
+                // have to occur.
 
                 schedule_queue_[scheduler_id]->insert(smallest_event);
                 scheduled_event_pointer_[lp_id] = smallest_event;
@@ -113,36 +114,44 @@ void TimeWarpEventSet::insertEvent (unsigned int lp_id, std::shared_ptr<Event> e
 /*
  *  NOTE: caller must always have the input queue lock for the lp with id lp_id
  */
-std::shared_ptr<Event> TimeWarpEventSet::getEvent (unsigned int thread_id) {
+std::vector<std::shared_ptr<Event>> TimeWarpEventSet::getEvent (
+                                    unsigned int thread_id, unsigned int count) {
 
     unsigned int scheduler_id = worker_thread_scheduler_map_[thread_id];
+    std::vector<std::shared_ptr<Event>> event_list;
 
     schedule_queue_lock_[scheduler_id].lock();
 
 #ifdef LADDER_QUEUE_SCHEDULER
-    auto event = schedule_queue_[scheduler_id]->begin();
-    if (event != nullptr) {
+    auto temp_list = schedule_queue_[scheduler_id]->begin(count);
+    for (auto event : temp_list) {
+        if (!event) continue;
+        event_list.push_back(event);
         schedule_queue_[scheduler_id]->erase(event);
     }
 #else
-    auto event_iterator = schedule_queue_[scheduler_id]->begin();
-    auto event = (event_iterator != schedule_queue_[scheduler_id]->end()) ?
+    for (unsigned int i = 0; i < count; i++) {
+        auto event_iterator = schedule_queue_[scheduler_id]->begin();
+        auto event = (event_iterator != schedule_queue_[scheduler_id]->end()) ?
                     *event_iterator : nullptr;
-    if (event != nullptr) {
-        schedule_queue_[scheduler_id]->erase(event_iterator);
+        if (event != nullptr) {
+            event_list.push_back(event);
+            schedule_queue_[scheduler_id]->erase(event_iterator);
+        }
     }
 #endif
 
-    // NOTE: scheduled_event_pointer is not changed here so that other threads will not schedule new
-    // events and this thread can move events into processed queue and update schedule queue correctly.
+    // NOTE: scheduled_event_pointer is not changed here so that other threads will 
+    // not schedule new events and this thread can move events into processed queue 
+    // and update schedule queue correctly.
 
-    // NOTE: Event also remains in input queue until processing done. If this a a negative event
-    // then, a rollback will bring the processed positive event back to input queue and they will
-    // be cancelled.
+    // NOTE: Event also remains in input queue until processing done. If this is a 
+    // negative event then, a rollback will bring the processed positive event back 
+    // to input queue and they will be cancelled.
 
     schedule_queue_lock_[scheduler_id].unlock();
 
-    return event;
+    return event_list;
 }
 
 #ifdef LADDER_QUEUE_SCHEDULER
