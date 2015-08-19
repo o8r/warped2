@@ -155,17 +155,37 @@ void TimeWarpEventDispatcher::processEvents(unsigned int id) {
     bool terminate = false;
 
     while (!terminate) {
+        // NOTE: local_gvt_flag must be obtained before getting the next event 
+        //  to avoid the "simultaneous reporting problem"
+        local_gvt_flag = local_gvt_manager_->getLocalGVTFlag();
+
         auto event_list = event_set_->getEvent(thread_id, set_size_);
-        for (auto event : event_list) {
+
+        // If no events left to be processed
+        if (!event_list.size()) {
+            // Check whether simulation needs to be terminated
             if (termination_manager_->terminationStatus()) {
                 terminate = true;
-                break;
+                continue;
             }
-            // NOTE: local_gvt_flag must be obtained before getting the next event 
-            //  to avoid the "simultaneous reporting problem"
-            local_gvt_flag = local_gvt_manager_->getLocalGVTFlag();
 
-            if (event != nullptr) {
+            // This thread no longer has anything to do because 
+            // it's schedule queue is empty.
+            if (!termination_manager_->threadPassive(thread_id)) {
+                termination_manager_->setThreadPassive(thread_id);
+            }
+
+            // We must have this so that the GVT calculations can 
+            // continue with passive threads. Just report infinite for a time.
+            local_gvt_manager_->receiveEventUpdateState((unsigned int)-1, 
+                                                    thread_id, local_gvt_flag);
+        } else {
+            for (auto event : event_list) {
+                // Check whether simulation needs to be terminated
+                if (termination_manager_->terminationStatus()) {
+                    terminate = true;
+                    break;
+                }
 
                 // Make sure that if this thread is currently seen as passive, 
                 //  we update it's state so we don't terminate early.
@@ -268,18 +288,6 @@ void TimeWarpEventDispatcher::processEvents(unsigned int id) {
                 event_set_->acquireInputQueueLock(current_lp_id);
                 event_set_->replenishScheduler(current_lp_id);
                 event_set_->releaseInputQueueLock(current_lp_id);
-
-            } else {
-                // This thread no longer has anything to do because 
-                // it's schedule queue is empty.
-                if (!termination_manager_->threadPassive(thread_id)) {
-                    termination_manager_->setThreadPassive(thread_id);
-                }
-
-                // We must have this so that the GVT calculations can 
-                // continue with passive threads. Just report infinite for a time.
-                local_gvt_manager_->receiveEventUpdateState((unsigned int)-1,
-                                                        thread_id, local_gvt_flag);
             }
         }
     }
