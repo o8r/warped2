@@ -150,19 +150,17 @@ void TimeWarpEventDispatcher::startSimulation(const std::vector<std::vector<Logi
 void TimeWarpEventDispatcher::processEvents(unsigned int id) {
 
     thread_id = id;
-    unsigned int local_gvt_flag;
-    unsigned int gvt = 0;
     bool terminate = false;
 
     while (!terminate) {
-        // NOTE: local_gvt_flag must be obtained before getting the next event 
-        //  to avoid the "simultaneous reporting problem"
-        local_gvt_flag = local_gvt_manager_->getLocalGVTFlag();
-
         auto event_list = event_set_->getEvent(thread_id, set_size_);
 
         // If no events left to be processed
         if (!event_list.size()) {
+            // NOTE: local_gvt_flag must be obtained before getting the next event 
+            //  to avoid the "simultaneous reporting problem"
+            auto local_gvt_flag = local_gvt_manager_->getLocalGVTFlag();
+
             // Check whether simulation needs to be terminated
             if (termination_manager_->terminationStatus()) {
                 terminate = true;
@@ -181,6 +179,10 @@ void TimeWarpEventDispatcher::processEvents(unsigned int id) {
                                                     thread_id, local_gvt_flag);
         } else {
             for (auto event : event_list) {
+                // NOTE: local_gvt_flag must be obtained before getting the next event 
+                //  to avoid the "simultaneous reporting problem"
+                auto local_gvt_flag = local_gvt_manager_->getLocalGVTFlag();
+
                 // Check whether simulation needs to be terminated
                 if (termination_manager_->terminationStatus()) {
                     terminate = true;
@@ -261,6 +263,7 @@ void TimeWarpEventDispatcher::processEvents(unsigned int id) {
                 // Send new events
                 sendEvents(event, new_events, current_lp_id, current_lp);
 
+                unsigned int gvt = 0;
                 if (comm_manager_->getNumProcesses() > 1) {
                     gvt = mattern_gvt_manager_->getGVT();
                 } else {
