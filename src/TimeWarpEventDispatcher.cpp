@@ -152,11 +152,15 @@ void TimeWarpEventDispatcher::processEvents(unsigned int id) {
     thread_id = id;
     unsigned int local_gvt_flag;
     unsigned int gvt = 0;
+    bool terminate = false;
 
-    while (!termination_manager_->terminationStatus()) {
-
+    while (!terminate) {
         auto event_list = event_set_->getEvent(thread_id, set_size_);
         for (auto event : event_list) {
+            if (termination_manager_->terminationStatus()) {
+                terminate = true;
+                break;
+            }
             // NOTE: local_gvt_flag must be obtained before getting the next event 
             //  to avoid the "simultaneous reporting problem"
             local_gvt_flag = local_gvt_manager_->getLocalGVTFlag();

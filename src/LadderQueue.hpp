@@ -25,7 +25,7 @@ namespace warped {
 class LadderQueue {
 public:
     LadderQueue();
-    std::shared_ptr<Event> begin(unsigned int count);
+    std::vector<std::shared_ptr<Event>> begin(unsigned int count);
     bool erase(std::shared_ptr<Event> event);
     void insert(std::shared_ptr<Event> event);
 

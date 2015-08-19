@@ -19,13 +19,20 @@ LadderQueue::LadderQueue() {
     }
 }
 
-std::shared_ptr<Event> LadderQueue::begin(unsigned int count) {
+std::vector<std::shared_ptr<Event>> LadderQueue::begin(unsigned int count) {
 
     std::cout << count << std::endl;
+    std::vector<std::shared_ptr<Event>> event_list;
 
     /* Remove from bottom if not empty */
     if (!bottom_.empty()) {
-        return *bottom_.begin();
+        auto iter = bottom_.begin();
+        while (iter != bottom_.end() && count) {
+            event_list.push_back(*iter);
+            count--;
+            iter++;
+        }
+        return event_list;
     }
 
     /* If rungs exist, remove from rungs */
@@ -72,12 +79,19 @@ std::shared_ptr<Event> LadderQueue::begin(unsigned int count) {
             }
         }
 
-        if (bottom_.empty()) return nullptr;
-        return *bottom_.begin();
+        if (!bottom_.empty()) {
+            auto iter = bottom_.begin();
+            while (iter != bottom_.end() && count) {
+                event_list.push_back(*iter);
+                count--;
+                iter++;
+            }
+        }
+        return event_list;
     }
 
     /* Check if top has any events before proceeding further*/
-    if (top_.empty()) return nullptr;
+    if (top_.empty()) return event_list;
 
     /* Move from top to top of empty ladder */
     /* Check if failed to create the first rung */
@@ -141,8 +155,15 @@ std::shared_ptr<Event> LadderQueue::begin(unsigned int count) {
         }
     }
 
-    if (bottom_.empty()) return nullptr;
-    return *bottom_.begin();
+    if (!bottom_.empty()) {
+        auto iter = bottom_.begin();
+        while (iter != bottom_.end() && count) {
+            event_list.push_back(*iter);
+            count--;
+            iter++;
+        }
+    }
+    return event_list;
 }
 
 bool LadderQueue::erase(std::shared_ptr<Event> event) {

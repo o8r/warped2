@@ -125,7 +125,7 @@ std::vector<std::shared_ptr<Event>> TimeWarpEventSet::getEvent (
 #ifdef LADDER_QUEUE_SCHEDULER
     auto temp_list = schedule_queue_[scheduler_id]->begin(count);
     for (auto event : temp_list) {
-        if (!event) continue;
+        if (event == nullptr) break;
         event_list.push_back(event);
         schedule_queue_[scheduler_id]->erase(event);
     }
@@ -134,10 +134,9 @@ std::vector<std::shared_ptr<Event>> TimeWarpEventSet::getEvent (
         auto event_iterator = schedule_queue_[scheduler_id]->begin();
         auto event = (event_iterator != schedule_queue_[scheduler_id]->end()) ?
                     *event_iterator : nullptr;
-        if (event != nullptr) {
-            event_list.push_back(event);
-            schedule_queue_[scheduler_id]->erase(event_iterator);
-        }
+        if (event == nullptr) break;
+        event_list.push_back(event);
+        schedule_queue_[scheduler_id]->erase(event_iterator);
     }
 #endif
 

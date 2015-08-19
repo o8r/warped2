@@ -235,6 +235,7 @@ Configuration::makeDispatcher(std::shared_ptr<TimeWarpCommunicationManager> comm
         if (!checkTimeWarpConfigs(chain_set_size, all_config_ids, comm_manager)) {
             invalid_string += std::string("\tEvent chain set size\n");
         }
+
         // LP MIGRATION
         auto lp_migration_status = (*root_)["time-warp"]["lp-migration"].asString();
         if (lp_migration_status == "off") {
