@@ -46,7 +46,7 @@ TimeWarpEventDispatcher::TimeWarpEventDispatcher(
     unsigned int max_sim_time,
     unsigned int num_worker_threads,
     bool is_lp_migration_on,
-    unsigned int set_size,
+    unsigned int block_size,
     std::shared_ptr<TimeWarpCommunicationManager> comm_manager,
     std::unique_ptr<TimeWarpEventSet> event_set,
     std::unique_ptr<TimeWarpMatternGVTManager> mattern_gvt_manager,
@@ -57,7 +57,7 @@ TimeWarpEventDispatcher::TimeWarpEventDispatcher(
     std::unique_ptr<TimeWarpTerminationManager> termination_manager,
     std::unique_ptr<TimeWarpStatistics> tw_stats) :
         EventDispatcher(max_sim_time), num_worker_threads_(num_worker_threads),
-        is_lp_migration_on_(is_lp_migration_on), set_size_(set_size), 
+        is_lp_migration_on_(is_lp_migration_on), block_size_(block_size), 
         comm_manager_(comm_manager), event_set_(std::move(event_set)), 
         mattern_gvt_manager_(std::move(mattern_gvt_manager)),
         local_gvt_manager_(std::move(local_gvt_manager)), state_manager_(std::move(state_manager)),
@@ -153,7 +153,7 @@ void TimeWarpEventDispatcher::processEvents(unsigned int id) {
     bool terminate = false;
 
     while (!terminate) {
-        auto event_list = event_set_->getEvent(thread_id, set_size_);
+        auto event_list = event_set_->getEvent(thread_id, block_size_);
 
         // If no events left to be processed
         if (!event_list.size()) {
