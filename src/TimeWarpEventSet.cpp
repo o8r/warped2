@@ -236,8 +236,6 @@ std::unique_ptr<std::vector<std::shared_ptr<Event>>>
 /*
  *  NOTE: call must always have input queue lock for the lp which corresponds to lp_id
  *
- *  NOTE: This is called in the case of an negative message and no event is processed.
- *
  *  NOTE: This can only be called by the thread that handles events for the lp with id lp_id
  *
  */
@@ -260,6 +258,8 @@ void TimeWarpEventSet::startScheduling (unsigned int lp_id) {
  *  NOTE: This can only be called by the thread that handles event for the lp with id lp_id
  *
  *  NOTE: caller must always have the input queue lock for the lp which corresponds to lp_id
+ *
+ *  NOTE: This is called in the case of an negative message and no event is processed.
  *
  *  NOTE: the scheduled_event_pointer is also protected by input queue lock
  */
