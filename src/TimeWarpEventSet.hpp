@@ -12,6 +12,7 @@
 #include <mutex>
 #include <memory>
 #include <atomic>
+#include <utility>
 
 #include "LogicalProcess.hpp"
 #include "Event.hpp"
@@ -55,7 +56,7 @@ public:
 
     void startScheduling (unsigned int lp_id);
 
-    void replenishScheduler (unsigned int lp_id);
+    void replenishScheduler (std::vector<std::pair<unsigned int,bool>> lp_id_list);
 
     void cancelEvent (unsigned int lp_id, std::shared_ptr<Event> cancel_event);
 

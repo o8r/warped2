@@ -178,6 +178,8 @@ void TimeWarpEventDispatcher::processEvents(unsigned int id) {
             local_gvt_manager_->receiveEventUpdateState((unsigned int)-1, 
                                                     thread_id, local_gvt_flag);
         } else {
+            std::vector<std::pair<unsigned int, bool>> lp_list;
+
             for (auto event : event_list) {
                 // NOTE: local_gvt_flag must be obtained before getting the next event 
                 //  to avoid the "simultaneous reporting problem"
@@ -233,64 +235,78 @@ void TimeWarpEventDispatcher::processEvents(unsigned int id) {
                 if (event->event_type_ == EventType::NEGATIVE) {
                     event_set_->acquireInputQueueLock(current_lp_id);
                     event_set_->cancelEvent(current_lp_id, event);
-                    event_set_->startScheduling(current_lp_id);
                     event_set_->releaseInputQueueLock(current_lp_id);
 
-                    tw_stats_->upCount(CANCELLED_EVENTS, thread_id);
-                    continue;
-                }
+                    // Keep record of LPs that need to update scheduler
+                    lp_list.push_back(std::pair<unsigned int, bool> (current_lp_id, false));
 
-                // If needed, report event for this thread so GVT can be calculated
-                auto lowest_timestamp = event->timestamp();
+                    tw_stats_->upCount(CANCELLED_EVENTS, thread_id);
+
+                } else {
+                    // If needed, report event for this thread so GVT can be calculated
+                    auto lowest_timestamp = event->timestamp();
 
 #if LADDER_QUEUE_SCHEDULER
 #if PARTIALLY_UNSORTED_EVENT_SET
-                lowest_timestamp = event_set_->lowestTimestamp(thread_id);
+                    lowest_timestamp = event_set_->lowestTimestamp(thread_id);
 #endif
 #endif
 
-                local_gvt_manager_->receiveEventUpdateState(
-                        lowest_timestamp, thread_id, local_gvt_flag);
+                    local_gvt_manager_->receiveEventUpdateState(
+                            lowest_timestamp, thread_id, local_gvt_flag);
 
-                // process event and get new events
-                auto new_events = current_lp->receiveEvent(*event);
+                    // process event and get new events
+                    auto new_events = current_lp->receiveEvent(*event);
 
-                tw_stats_->upCount(EVENTS_PROCESSED, thread_id);
+                    tw_stats_->upCount(EVENTS_PROCESSED, thread_id);
 
-                // Save state
-                state_manager_->saveState(event, current_lp_id, current_lp);
+                    // Save state
+                    state_manager_->saveState(event, current_lp_id, current_lp);
 
-                // Send new events
-                sendEvents(event, new_events, current_lp_id, current_lp);
+                    // Send new events
+                    sendEvents(event, new_events, current_lp_id, current_lp);
 
-                unsigned int gvt = 0;
-                if (comm_manager_->getNumProcesses() > 1) {
-                    gvt = mattern_gvt_manager_->getGVT();
-                } else {
-                    gvt = local_gvt_manager_->getGVT();
+                    unsigned int gvt = 0;
+                    if (comm_manager_->getNumProcesses() > 1) {
+                        gvt = mattern_gvt_manager_->getGVT();
+                    } else {
+                        gvt = local_gvt_manager_->getGVT();
+                    }
+
+                    if (gvt > current_lp->last_fossil_collect_gvt_) {
+                        current_lp->last_fossil_collect_gvt_ = gvt;
+
+                        // Fossil collect all queues for this lp
+                        twfs_manager_->fossilCollect(gvt, current_lp_id);
+                        output_manager_->fossilCollect(gvt, current_lp_id);
+
+                        unsigned int event_fossil_collect_time =
+                            state_manager_->fossilCollect(gvt, current_lp_id);
+
+                        unsigned int num_committed =
+                            event_set_->fossilCollect(
+                                        event_fossil_collect_time, current_lp_id);
+
+                        tw_stats_->upCount(EVENTS_COMMITTED, thread_id, num_committed);
+                    }
+
+                    // Keep record of LPs that need to update scheduler
+                    lp_list.push_back(std::pair<unsigned int, bool> (current_lp_id, true));
                 }
+            }
 
-                if (gvt > current_lp->last_fossil_collect_gvt_) {
-                    current_lp->last_fossil_collect_gvt_ = gvt;
+            // Lock all the input queues in the event block
+            for (auto lp : lp_list) {
+                event_set_->acquireInputQueueLock(std::get<0> (lp));
+            }
 
-                    // Fossil collect all queues for this lp
-                    twfs_manager_->fossilCollect(gvt, current_lp_id);
-                    output_manager_->fossilCollect(gvt, current_lp_id);
+            // Move the next event from LPs (of the event block) into the schedule queue
+            // Also transfer old events from the block to their respective processed queue
+            event_set_->replenishScheduler(lp_list);
 
-                    unsigned int event_fossil_collect_time =
-                        state_manager_->fossilCollect(gvt, current_lp_id);
-
-                    unsigned int num_committed =
-                        event_set_->fossilCollect(event_fossil_collect_time, current_lp_id);
-
-                    tw_stats_->upCount(EVENTS_COMMITTED, thread_id, num_committed);
-                }
-
-                // Move the next event from lp into the schedule queue
-                // Also transfer old event to processed queue
-                event_set_->acquireInputQueueLock(current_lp_id);
-                event_set_->replenishScheduler(current_lp_id);
-                event_set_->releaseInputQueueLock(current_lp_id);
+            // Unlock all the input queues in the event block
+            for (auto lp : lp_list) {
+                event_set_->releaseInputQueueLock(std::get<0> (lp));
             }
         }
     }

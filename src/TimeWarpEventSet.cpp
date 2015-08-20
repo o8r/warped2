@@ -263,38 +263,52 @@ void TimeWarpEventSet::startScheduling (unsigned int lp_id) {
  *
  *  NOTE: the scheduled_event_pointer is also protected by input queue lock
  */
-void TimeWarpEventSet::replenishScheduler (unsigned int lp_id) {
+void TimeWarpEventSet::replenishScheduler (std::vector<std::pair<unsigned int,bool>> lp_list) {
 
-    // Something is completely wrong if there is no scheduled event because we obviously just
-    // processed an event that was scheduled.
-    assert(scheduled_event_pointer_[lp_id]);
+    if (!lp_list.size()) assert(0);
+    auto lp = *lp_list.begin();
+    unsigned int lp_id = std::get<0> (lp);
+    unsigned int scheduler_id = input_queue_scheduler_map_[lp_id];
 
-    // Move the just processed event to the processed queue
-    auto num_erased = input_queue_[lp_id]->erase(scheduled_event_pointer_[lp_id]);
-    assert(num_erased == 1);
-    unused(num_erased);
-
-    processed_queue_[lp_id]->push_back(scheduled_event_pointer_[lp_id]);
-
-    // Map the lp to the next schedule queue (cyclic order)
+    // Map all LPs to the next schedule queue (cyclic order)
     // This is supposed to balance the load across all the schedule queues
     // Input queue lock is sufficient to ensure consistency
-    unsigned int scheduler_id = input_queue_scheduler_map_[lp_id];
     if (is_lp_migration_on_) {
         scheduler_id = (scheduler_id + 1) % num_of_schedulers_;
         input_queue_scheduler_map_[lp_id] = scheduler_id;
     }
+    schedule_queue_lock_[scheduler_id].lock();
 
-    // Update scheduler with new event for the lp the previous event was executed for
-    // NOTE: A pointer to the scheduled event will remain in the input queue
-    if (!input_queue_[lp_id]->empty()) {
-        scheduled_event_pointer_[lp_id] = *input_queue_[lp_id]->begin();
-        schedule_queue_lock_[scheduler_id].lock();
-        schedule_queue_[scheduler_id]->insert(scheduled_event_pointer_[lp_id]);
-        schedule_queue_lock_[scheduler_id].unlock();
-    } else {
-        scheduled_event_pointer_[lp_id] = nullptr;
+    for (auto lp : lp_list) {
+
+        unsigned int lp_id = std::get<0> (lp);
+
+        // Start scheduling or replenish scheduler
+        bool want_to_replenish = std::get<1> (lp);
+        if (want_to_replenish) {
+            // Something is completely wrong if there is no scheduled event because 
+            // we obviously just processed an event that was scheduled.
+            assert(scheduled_event_pointer_[lp_id]);
+
+            // Move the just processed event to the processed queue
+            auto num_erased = input_queue_[lp_id]->erase(scheduled_event_pointer_[lp_id]);
+            assert(num_erased == 1);
+            unused(num_erased);
+
+            processed_queue_[lp_id]->push_back(scheduled_event_pointer_[lp_id]);
+        }
+
+        // Update scheduler with new event for the lp the previous event was executed for
+        // NOTE: A pointer to the scheduled event will remain in the input queue
+        if (!input_queue_[lp_id]->empty()) {
+            scheduled_event_pointer_[lp_id] = *input_queue_[lp_id]->begin();
+            schedule_queue_[scheduler_id]->insert(scheduled_event_pointer_[lp_id]);
+        } else {
+            scheduled_event_pointer_[lp_id] = nullptr;
+        }
     }
+
+    schedule_queue_lock_[scheduler_id].unlock();
 }
 
 void TimeWarpEventSet::cancelEvent (unsigned int lp_id, std::shared_ptr<Event> cancel_event) {
