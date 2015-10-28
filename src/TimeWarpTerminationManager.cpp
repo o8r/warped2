@@ -36,7 +36,7 @@ bool TimeWarpTerminationManager::sendTerminationToken(State state, unsigned int 
 
     auto msg = make_unique<TerminationToken>(sender_id, (sender_id + 1) % num_processes, state, initiator);
 
-    comm_manager_->insertMessage(std::move(msg));
+    comm_manager_->sendMessage(std::move(msg));
 
     return true;
 }
@@ -70,7 +70,7 @@ void TimeWarpTerminationManager::sendTerminator() {
     // Send terminator to all nodes including self, it is now time to terminate
     for (unsigned int i = 0; i < comm_manager_->getNumProcesses(); i++) {
         auto terminator_msg = make_unique<Terminator>(0, i);
-        comm_manager_->insertMessage(std::move(terminator_msg));
+        comm_manager_->sendMessage(std::move(terminator_msg));
     }
 }
 

@@ -139,7 +139,7 @@ void TimeWarpMatternGVTManager::sendMatternGVTToken(unsigned int local_minimum) 
 
     state_.lock_.unlock();
 
-    comm_manager_->insertMessage(std::move(msg));
+    comm_manager_->sendMessage(std::move(msg));
 
     gVT_token_pending_ = false;
 
@@ -219,7 +219,7 @@ void TimeWarpMatternGVTManager::sendGVTUpdate(unsigned int gvt) {
     // Send GVT update to all nodes including self
     for (unsigned int i = 0; i < comm_manager_->getNumProcesses(); i++) {
         auto update_msg = make_unique<GVTUpdateMessage>(0, i, gvt);
-        comm_manager_->insertMessage(std::move(update_msg));
+        comm_manager_->sendMessage(std::move(update_msg));
     }
 }
 

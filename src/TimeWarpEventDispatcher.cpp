@@ -36,7 +36,6 @@
 #include "utility/warnings.hpp"
 
 WARPED_REGISTER_POLYMORPHIC_SERIALIZABLE_CLASS(warped::EventMessage)
-WARPED_REGISTER_POLYMORPHIC_SERIALIZABLE_CLASS(warped::Event)
 WARPED_REGISTER_POLYMORPHIC_SERIALIZABLE_CLASS(warped::NegativeEvent)
 
 namespace warped {
@@ -81,7 +80,7 @@ void TimeWarpEventDispatcher::startSimulation(const std::vector<std::vector<Logi
     // Master thread main loop
     while (!termination_manager_->terminationStatus()) {
 
-        comm_manager_->sendMessages();
+        comm_manager_->handleMessageQueues();
         comm_manager_->deliverReceivedMessages();
 
         // Check to see if we should start/continue the termination process
@@ -480,13 +479,7 @@ TimeWarpEventDispatcher::initialize(const std::vector<std::vector<LogicalProcess
         }
     }
 
-    // Send and receive remote initial events
-    comm_manager_->sendMessages();
     comm_manager_->waitForAllProcesses();
-
-    // Give some time for messages to be sent and received.
-    std::this_thread::sleep_for(std::chrono::seconds(1));
-
     comm_manager_->deliverReceivedMessages();
     comm_manager_->waitForAllProcesses();
 }
@@ -506,7 +499,7 @@ void TimeWarpEventDispatcher::enqueueRemoteEvent(std::shared_ptr<Event> event,
     if (event->timestamp() <= max_sim_time_) {
         auto color = mattern_gvt_manager_->sendUpdate(event->timestamp());
         auto event_msg = make_unique<EventMessage>(comm_manager_->getID(), receiver_id, event, color);
-        comm_manager_->insertMessage(std::move(event_msg));
+        comm_manager_->sendMessage(std::move(event_msg));
     }
 }
 

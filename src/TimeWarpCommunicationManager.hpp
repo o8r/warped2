@@ -39,13 +39,11 @@ public:
 
     virtual int gatherUint64(uint64_t* send_local, uint64_t* recv_root) = 0;
 
-    virtual void insertMessage(std::unique_ptr<TimeWarpKernelMessage> msg) = 0;
+    virtual void sendMessage(std::unique_ptr<TimeWarpKernelMessage> msg) = 0;
 
-    // Gets next message if there is one
+    virtual void handleMessageQueues() = 0;
+
     virtual std::unique_ptr<TimeWarpKernelMessage> getMessage() = 0;
-
-    // Sends all messages inserted into queue
-    virtual void sendMessages() = 0;
 
     // Gets all messages and passes messages to the correct message handler
     void deliverReceivedMessages();

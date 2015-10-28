@@ -24,23 +24,31 @@ public:
         max_buffer_size_(max_buffer_size) {}
 
     unsigned int initialize();
+
     void finalize();
+
     unsigned int getNumProcesses();
+
     unsigned int getID();
+
     int waitForAllProcesses();
 
-    void insertMessage(std::unique_ptr<TimeWarpKernelMessage> msg);
-    void sendMessages();
+    int sumReduceUint64(uint64_t* send_local, uint64_t* recv_global);
+
+    int gatherUint64(uint64_t* send_local, uint64_t* recv_root);
+
+    void sendMessage(std::unique_ptr<TimeWarpKernelMessage> msg);
+
+    void handleMessageQueues();
+
     std::unique_ptr<TimeWarpKernelMessage> getMessage();
+
+protected:
+    unsigned int startReceiveRequests();
 
     bool isInitiatingThread();
 
-    int sumReduceUint64(uint64_t* send_local, uint64_t* recv_global);
-    int gatherUint64(uint64_t* send_local, uint64_t* recv_root);
-
 private:
-    int testQueue(std::shared_ptr<MessageQueue> msg_queue);
-
     unsigned int max_buffer_size_;
 
     std::shared_ptr<MPISendQueue> send_queue_;
@@ -51,28 +59,27 @@ struct MessageQueue {
     MessageQueue(unsigned int max_buffer_size) :
         max_buffer_size_(max_buffer_size) {}
 
-    virtual unsigned int startRequests() = 0;
-    virtual void completeRequest(uint8_t *buffer) = 0;
+    virtual unsigned int testRequests() = 0;
 
     unsigned int max_buffer_size_;
 
+    unsigned int curr_pos_ = 0;
+    TicketLock lock_;
     std::deque<std::unique_ptr<TimeWarpKernelMessage>>  msg_list_;
-    TicketLock msg_list_lock_;
-
-    std::vector<std::unique_ptr<uint8_t []>>             buffer_list_;
-    std::vector<MPI_Request>                             request_list_;
+    std::vector<std::unique_ptr<uint8_t []>>            buffer_list_;
+    std::vector<MPI_Request>                            request_list_;
 };
 
 struct MPISendQueue : public MessageQueue {
-    MPISendQueue(unsigned int max_buffer_size) : MessageQueue(max_buffer_size) {}
-    unsigned int startRequests();
-    void completeRequest(uint8_t *buffer);
+    MPISendQueue(unsigned int max_buffer_size) :
+        MessageQueue(max_buffer_size) {}
+    unsigned int testRequests();
 };
 
 struct MPIRecvQueue : public MessageQueue {
-    MPIRecvQueue(unsigned int max_buffer_size) : MessageQueue(max_buffer_size) {}
-    unsigned int startRequests();
-    void completeRequest(uint8_t *buffer);
+    MPIRecvQueue(unsigned int max_buffer_size) :
+        MessageQueue(max_buffer_size) {}
+    unsigned int testRequests();
 };
 
 } // namespace warped
