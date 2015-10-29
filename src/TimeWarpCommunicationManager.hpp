@@ -39,14 +39,16 @@ public:
 
     virtual int gatherUint64(uint64_t* send_local, uint64_t* recv_root) = 0;
 
+    virtual void sendMessage(std::unique_ptr<TimeWarpKernelMessage> msg, unsigned int thread_id) = 0;
+
     virtual void sendMessage(std::unique_ptr<TimeWarpKernelMessage> msg) = 0;
 
-    virtual void handleMessageQueues() = 0;
+    virtual unsigned int startReceiveRequests(unsigned int thread_id) = 0;
 
-    virtual std::unique_ptr<TimeWarpKernelMessage> getMessage() = 0;
+    virtual std::unique_ptr<TimeWarpKernelMessage> getMessage(unsigned int thread_id) = 0;
 
     // Gets all messages and passes messages to the correct message handler
-    void deliverReceivedMessages();
+    void deliverReceivedMessages(unsigned int thread_id);
 
     // Adds a MessageType/Message handler pair for dispatching messages
     void addRecvMessageHandler(MessageType msg_type,

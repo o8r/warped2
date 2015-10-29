@@ -428,8 +428,9 @@ std::unique_ptr<Partitioner> Configuration::makeLocalPartitioner(unsigned int no
 
 std::shared_ptr<TimeWarpCommunicationManager> Configuration::makeCommunicationManager() {
     unsigned int max_buffer_size = (*root_)["time-warp"]["communication"]["max-buffer-size"].asUInt();
+    unsigned int num_worker_threads = (*root_)["time-warp"]["worker-threads"].asUInt();
 
-    return std::make_shared<TimeWarpMPICommunicationManager>(max_buffer_size);
+    return std::make_shared<TimeWarpMPICommunicationManager>(max_buffer_size, num_worker_threads);
 }
 
 } // namespace warped

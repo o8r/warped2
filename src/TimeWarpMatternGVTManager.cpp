@@ -154,6 +154,7 @@ void TimeWarpMatternGVTManager::receiveMatternGVTToken(
     state_.lock_.lock();
 
     if (process_id == 0) {
+
         // Initiator received the message
         if (msg->count <= 0) {
             // At this point all white messages are accounted for so we can

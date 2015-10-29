@@ -80,8 +80,8 @@ void TimeWarpEventDispatcher::startSimulation(const std::vector<std::vector<Logi
     // Master thread main loop
     while (!termination_manager_->terminationStatus()) {
 
-        comm_manager_->handleMessageQueues();
-        comm_manager_->deliverReceivedMessages();
+        comm_manager_->startReceiveRequests(thread_id);
+        comm_manager_->deliverReceivedMessages(thread_id);
 
         // Check to see if we should start/continue the termination process
         if (termination_manager_->nodePassive()) {
@@ -479,8 +479,9 @@ TimeWarpEventDispatcher::initialize(const std::vector<std::vector<LogicalProcess
         }
     }
 
-    comm_manager_->waitForAllProcesses();
-    comm_manager_->deliverReceivedMessages();
+    comm_manager_->startReceiveRequests(thread_id);
+    comm_manager_->deliverReceivedMessages(thread_id);
+
     comm_manager_->waitForAllProcesses();
 }
 
@@ -499,7 +500,10 @@ void TimeWarpEventDispatcher::enqueueRemoteEvent(std::shared_ptr<Event> event,
     if (event->timestamp() <= max_sim_time_) {
         auto color = mattern_gvt_manager_->sendUpdate(event->timestamp());
         auto event_msg = make_unique<EventMessage>(comm_manager_->getID(), receiver_id, event, color);
-        comm_manager_->sendMessage(std::move(event_msg));
+
+        comm_manager_->startReceiveRequests(thread_id);
+        comm_manager_->deliverReceivedMessages(thread_id);
+        comm_manager_->sendMessage(std::move(event_msg), thread_id);
     }
 }
 
