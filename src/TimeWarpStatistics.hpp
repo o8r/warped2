@@ -23,19 +23,20 @@ struct Stats {
         uint64_t,                   // Local negative events sent   2
         uint64_t,                   // Remote positive events sent  3
         uint64_t,                   // Total events sent            4
-        double,                     // Percent remote events        5
-        uint64_t,                   // Primary rollbacks            6
-        uint64_t,                   // Secondary rollbacks          7
-        uint64_t,                   // Total rollbacks              8
-        uint64_t,                   // Coast forward events         9
-        uint64_t,                   // Events processed             10
-        uint64_t,                   // Events committed             11
-        uint64_t,                   // Total negative events sent   12
-        uint64_t,                   // Cancelled events             13
-        uint64_t,                   // Average Maximum Memory       14
-        uint64_t,                   // GVT cycles                   15
-        uint64_t,                   // Number of objects            16
-        uint64_t                    // dummy/number of elements     17
+        uint64_t,                   // Total events received        5
+        double,                     // Percent remote events        6
+        uint64_t,                   // Primary rollbacks            7
+        uint64_t,                   // Secondary rollbacks          8
+        uint64_t,                   // Total rollbacks              9
+        uint64_t,                   // Coast forward events         10
+        uint64_t,                   // Events processed             11
+        uint64_t,                   // Events committed             12
+        uint64_t,                   // Total negative events sent   13
+        uint64_t,                   // Cancelled events             14
+        uint64_t,                   // Average Maximum Memory       15
+        uint64_t,                   // GVT cycles                   16
+        uint64_t,                   // Number of objects            17
+        uint64_t                    // dummy/number of elements     18
     > stats_;
 
     template<unsigned I>
@@ -50,19 +51,20 @@ const stats_index<1> REMOTE_POSITIVE_EVENTS_SENT;
 const stats_index<2> LOCAL_NEGATIVE_EVENTS_SENT;
 const stats_index<3> REMOTE_NEGATIVE_EVENTS_SENT;
 const stats_index<4> TOTAL_EVENTS_SENT;
-const stats_index<5> PERCENT_REMOTE;
-const stats_index<6> PRIMARY_ROLLBACKS;
-const stats_index<7> SECONDARY_ROLLBACKS;
-const stats_index<8> TOTAL_ROLLBACKS;
-const stats_index<9> COAST_FORWARDED_EVENTS;
-const stats_index<10> EVENTS_PROCESSED;
-const stats_index<11> EVENTS_COMMITTED;
-const stats_index<12> TOTAL_NEGATIVE_EVENTS;
-const stats_index<13> CANCELLED_EVENTS;
-const stats_index<14> AVERAGE_MAX_MEMORY;
-const stats_index<15> GVT_CYCLES;
-const stats_index<16> NUM_OBJECTS;
-const stats_index<17> NUM_STATISTICS;
+const stats_index<5> TOTAL_EVENTS_RECEIVED;
+const stats_index<6> PERCENT_REMOTE;
+const stats_index<7> PRIMARY_ROLLBACKS;
+const stats_index<8> SECONDARY_ROLLBACKS;
+const stats_index<9> TOTAL_ROLLBACKS;
+const stats_index<10> COAST_FORWARDED_EVENTS;
+const stats_index<11> EVENTS_PROCESSED;
+const stats_index<12> EVENTS_COMMITTED;
+const stats_index<13> TOTAL_NEGATIVE_EVENTS;
+const stats_index<14> CANCELLED_EVENTS;
+const stats_index<15> AVERAGE_MAX_MEMORY;
+const stats_index<16> GVT_CYCLES;
+const stats_index<17> NUM_OBJECTS;
+const stats_index<18> NUM_STATISTICS;
 
 class TimeWarpStatistics {
 public:
@@ -120,6 +122,7 @@ private:
     uint64_t *cancelled_events_by_node_;
     uint64_t *processed_events_by_node_;
     uint64_t *committed_events_by_node_;
+    uint64_t *total_events_received_by_node_;
     uint64_t *num_objects_by_node_;
 
     std::shared_ptr<TimeWarpCommunicationManager> comm_manager_;

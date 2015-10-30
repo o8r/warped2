@@ -12,6 +12,7 @@
 #include <cstring>      // for std::memset
 #include <iostream>
 #include <cassert>
+#include <future>
 
 #include <pthread.h>
 #include <unistd.h>
@@ -24,6 +25,7 @@
 #include "LTSFQueue.hpp"
 #include "Partitioner.hpp"
 #include "LogicalProcess.hpp"
+#include "SpinningThreadBarrier.hpp"
 #include "TimeWarpMPICommunicationManager.hpp"
 #include "TimeWarpMatternGVTManager.hpp"
 #include "TimeWarpLocalGVTManager.hpp"
@@ -41,6 +43,7 @@ WARPED_REGISTER_POLYMORPHIC_SERIALIZABLE_CLASS(warped::NegativeEvent)
 namespace warped {
 
 thread_local unsigned int TimeWarpEventDispatcher::thread_id;
+SpinningThreadBarrier start_barrier;
 
 TimeWarpEventDispatcher::TimeWarpEventDispatcher(unsigned int max_sim_time,
     unsigned int num_worker_threads,
@@ -66,10 +69,12 @@ void TimeWarpEventDispatcher::startSimulation(const std::vector<std::vector<Logi
                                               lps) {
     initialize(lps);
 
+    start_barrier.init(num_worker_threads_);
+
     // Create worker threads
     std::vector<std::thread> threads;
     for (unsigned int i = 0; i < num_worker_threads_; ++i) {
-        auto thread(std::thread {&TimeWarpEventDispatcher::processEvents, this, i});
+        auto thread(std::thread {&TimeWarpEventDispatcher::processEvents, this, i, lps[i]});
         thread.detach();
         threads.push_back(std::move(thread));
     }
@@ -80,8 +85,7 @@ void TimeWarpEventDispatcher::startSimulation(const std::vector<std::vector<Logi
     // Master thread main loop
     while (!termination_manager_->terminationStatus()) {
 
-        comm_manager_->startReceiveRequests(thread_id);
-        comm_manager_->deliverReceivedMessages(thread_id);
+        comm_manager_->handleReceives();
 
         // Check to see if we should start/continue the termination process
         if (termination_manager_->nodePassive()) {
@@ -114,7 +118,6 @@ void TimeWarpEventDispatcher::startSimulation(const std::vector<std::vector<Logi
         if (mattern_gvt_manager_->startGVT() || mattern_gvt_manager_->needLocalGVT()) {
             local_gvt_manager_->startGVT();
         }
-
     }
 
     comm_manager_->waitForAllProcesses();
@@ -158,11 +161,21 @@ void TimeWarpEventDispatcher::onGVT(unsigned int gvt) {
     tw_stats_->updateAverage(AVERAGE_MAX_MEMORY, mem, c);
 }
 
-void TimeWarpEventDispatcher::processEvents(unsigned int id) {
+void TimeWarpEventDispatcher::processEvents(unsigned int id, const std::vector<LogicalProcess*>& lps) {
 
     thread_id = id;
     unsigned int local_gvt_flag;
     unsigned int gvt = 0;
+
+    start_barrier.wait();
+    auto initial_event = std::make_shared<InitialEvent>();
+    for (auto& lp : lps) {
+        unsigned int lp_id = local_lp_id_by_name_[lp->name_];
+        auto new_events = lp->initializeLP();
+        sendEvents(initial_event, new_events, lp_id, lp);
+        state_manager_->saveState(initial_event, lp_id, lp);
+    }
+    start_barrier.wait();
 
     while (!termination_manager_->terminationStatus()) {
         // NOTE: local_gvt_flag must be obtained before getting the next event to avoid the
@@ -337,6 +350,8 @@ void TimeWarpEventDispatcher::sendLocalEvent(std::shared_ptr<Event> event) {
     event_set_->acquireInputQueueLock(receiver_lp_id);
     event_set_->insertEvent(receiver_lp_id, event);
     event_set_->releaseInputQueueLock(receiver_lp_id);
+
+    tw_stats_->upCount(TOTAL_EVENTS_RECEIVED, thread_id);
 }
 
 void TimeWarpEventDispatcher::cancelEvents(
@@ -468,20 +483,6 @@ TimeWarpEventDispatcher::initialize(const std::vector<std::vector<LogicalProcess
     // Initialize statistics data structures
     tw_stats_->initialize(num_worker_threads_, num_local_lps_);
 
-    // Send local initial events and enqueue remote initial events
-    auto initial_event = std::make_shared<InitialEvent>();
-    for (auto& partition : lps) {
-        for (auto& lp : partition) {
-            unsigned int lp_id = local_lp_id_by_name_[lp->name_];
-            auto new_events = lp->initializeLP();
-            sendEvents(initial_event, new_events, lp_id, lp);
-            state_manager_->saveState(initial_event, lp_id, lp);
-        }
-    }
-
-    comm_manager_->startReceiveRequests(thread_id);
-    comm_manager_->deliverReceivedMessages(thread_id);
-
     comm_manager_->waitForAllProcesses();
 }
 
@@ -501,8 +502,6 @@ void TimeWarpEventDispatcher::enqueueRemoteEvent(std::shared_ptr<Event> event,
         auto color = mattern_gvt_manager_->sendUpdate(event->timestamp());
         auto event_msg = make_unique<EventMessage>(comm_manager_->getID(), receiver_id, event, color);
 
-        comm_manager_->startReceiveRequests(thread_id);
-        comm_manager_->deliverReceivedMessages(thread_id);
         comm_manager_->sendMessage(std::move(event_msg), thread_id);
     }
 }

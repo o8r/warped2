@@ -16,6 +16,8 @@ struct MessageQueue;
 struct MPISendQueue;
 struct MPIRecvQueue;
 
+#define MPI_MSG_TAG 729
+
 class TimeWarpMPICommunicationManager : public TimeWarpCommunicationManager {
 public:
     TimeWarpMPICommunicationManager(unsigned int max_buffer_size, unsigned int num_worker_threads) :
@@ -37,21 +39,25 @@ public:
 
     void sendMessage(std::unique_ptr<TimeWarpKernelMessage> msg, unsigned int thread_id);
 
-    unsigned int startReceiveRequests(unsigned int thread_id);
-
     void sendMessage(std::unique_ptr<TimeWarpKernelMessage> msg);
 
-    std::unique_ptr<TimeWarpKernelMessage> getMessage(unsigned int thread_id);
+    bool handleReceives();
 
 protected:
+    unsigned int startReceiveRequests();
+
+    unsigned int testReceiveRequests();
+
+    unsigned int testSendRequests(unsigned int thread_id);
+
     bool isInitiatingThread();
 
 private:
     unsigned int max_buffer_size_;
     unsigned int num_worker_threads_;
 
-    std::shared_ptr<MPISendQueue> send_queue_;
-    std::shared_ptr<MPIRecvQueue> recv_queue_;
+    std::shared_ptr<MessageQueue> send_queue_;
+    std::shared_ptr<MessageQueue> recv_queue_;
 };
 
 struct PendingRequest {
@@ -65,30 +71,12 @@ struct PendingRequest {
 };
 
 struct MessageQueue {
-    MessageQueue(unsigned int max_buffer_size) :
-        max_buffer_size_(max_buffer_size) {}
-
-    virtual unsigned int testRequests(unsigned int thread_id) = 0;
+    MessageQueue(unsigned int max_buffer_size) : max_buffer_size_(max_buffer_size) {}
 
     unsigned int max_buffer_size_;
-
-    TicketLock mpi_lock_;
-
-    std::unique_ptr<std::deque<std::unique_ptr<TimeWarpKernelMessage>> []>  msg_list_;
-    std::vector<std::unique_ptr<PendingRequest>>        pending_request_list_;
+    std::unique_ptr<std::vector<std::unique_ptr<PendingRequest>> []>    pending_request_list_;
 };
 
-struct MPISendQueue : public MessageQueue {
-    MPISendQueue(unsigned int max_buffer_size) :
-        MessageQueue(max_buffer_size) {}
-    unsigned int testRequests(unsigned int thread_id);
-};
-
-struct MPIRecvQueue : public MessageQueue {
-    MPIRecvQueue(unsigned int max_buffer_size) :
-        MessageQueue(max_buffer_size) {}
-    unsigned int testRequests(unsigned int thread_id);
-};
 
 } // namespace warped
 

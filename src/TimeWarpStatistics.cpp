@@ -41,6 +41,9 @@ void TimeWarpStatistics::calculateStats() {
                                         global_stats_[REMOTE_NEGATIVE_EVENTS_SENT]) /
                     static_cast<double>(global_stats_[TOTAL_EVENTS_SENT]);
                 break;
+            case TOTAL_EVENTS_RECEIVED.value:
+                sumReduceLocal(TOTAL_EVENTS_RECEIVED, total_events_received_by_node_);
+                break;
             case PRIMARY_ROLLBACKS.value:
                 sumReduceLocal(PRIMARY_ROLLBACKS, primary_rollbacks_by_node_);
                 break;
@@ -164,6 +167,7 @@ void TimeWarpStatistics::printStats() {
               << "\tCoast forward events:      " << global_stats_[COAST_FORWARDED_EVENTS] << "\n\n"
 
               << "\tTotal events sent:         " << global_stats_[TOTAL_EVENTS_SENT] << "\n"
+              << "\tTotal events received:     " << global_stats_[TOTAL_EVENTS_RECEIVED] << "\n\n"
 
               << "\tTotal events processed:    " << global_stats_[EVENTS_PROCESSED] << "\n"
               << "\tTotal events committed:    " << global_stats_[EVENTS_COMMITTED] << "\n\n"

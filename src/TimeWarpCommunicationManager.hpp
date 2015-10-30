@@ -43,12 +43,7 @@ public:
 
     virtual void sendMessage(std::unique_ptr<TimeWarpKernelMessage> msg) = 0;
 
-    virtual unsigned int startReceiveRequests(unsigned int thread_id) = 0;
-
-    virtual std::unique_ptr<TimeWarpKernelMessage> getMessage(unsigned int thread_id) = 0;
-
-    // Gets all messages and passes messages to the correct message handler
-    void deliverReceivedMessages(unsigned int thread_id);
+    virtual bool handleReceives() = 0;
 
     // Adds a MessageType/Message handler pair for dispatching messages
     void addRecvMessageHandler(MessageType msg_type,
@@ -58,11 +53,12 @@ public:
 
     unsigned int getNodeID(std::string lp_name);
 
-private:
+protected:
     // Map to lookup message handler given a message type
     std::unordered_map<int, std::function<void(std::unique_ptr<TimeWarpKernelMessage>)>>
         msg_handler_by_msg_type_;
 
+private:
     std::unordered_map<std::string, unsigned int> node_id_by_lp_name_;
 
 };

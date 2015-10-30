@@ -71,7 +71,7 @@ private:
 
     void enqueueRemoteEvent(std::shared_ptr<Event> event, unsigned int receiver_id);
 
-    void processEvents(unsigned int id);
+    void processEvents(unsigned int id, const std::vector<LogicalProcess*>& lps);
 
 /* ====================== Used by only manager thread ========================= */
 

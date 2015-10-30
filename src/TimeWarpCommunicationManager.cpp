@@ -9,19 +9,6 @@ void TimeWarpCommunicationManager::addRecvMessageHandler(MessageType msg_type,
     msg_handler_by_msg_type_.insert(std::make_pair(msg_type_int, msg_handler));
 }
 
-void TimeWarpCommunicationManager::deliverReceivedMessages(unsigned int thread_id) {
-    auto msg = getMessage(thread_id);
-    while (msg.get() != nullptr) {
-        MessageType msg_type = msg->get_type();
-        int msg_type_int = static_cast<int>(msg_type);
-
-        auto msg_handler = msg_handler_by_msg_type_[msg_type_int];
-        msg_handler(std::move(msg));
-
-        msg = getMessage(thread_id);
-    }
-}
-
 void TimeWarpCommunicationManager::initializeLPMap(const std::vector<std::vector<LogicalProcess*>>& lps) {
     unsigned int partition_id = 0;
     for (auto& partition : lps) {
