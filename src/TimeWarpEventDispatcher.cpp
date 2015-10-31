@@ -85,7 +85,7 @@ void TimeWarpEventDispatcher::startSimulation(const std::vector<std::vector<Logi
     // Master thread main loop
     while (!termination_manager_->terminationStatus()) {
 
-        comm_manager_->handleReceives();
+        comm_manager_->handleReceives(thread_id);
 
         // Check to see if we should start/continue the termination process
         if (termination_manager_->nodePassive()) {
@@ -181,6 +181,8 @@ void TimeWarpEventDispatcher::processEvents(unsigned int id, const std::vector<L
         // NOTE: local_gvt_flag must be obtained before getting the next event to avoid the
         //  "simultaneous reporting problem"
         local_gvt_flag = local_gvt_manager_->getLocalGVTFlag();
+
+        comm_manager_->handleReceives(thread_id);
 
         std::shared_ptr<Event> event = event_set_->getEvent(thread_id);
         if (event != nullptr) {

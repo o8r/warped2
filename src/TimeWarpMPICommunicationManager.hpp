@@ -41,12 +41,12 @@ public:
 
     void sendMessage(std::unique_ptr<TimeWarpKernelMessage> msg);
 
-    bool handleReceives();
+    bool handleReceives(unsigned int thread_id);
 
 protected:
-    unsigned int startReceiveRequests();
+    unsigned int startReceiveRequests(unsigned int thread_id);
 
-    unsigned int testReceiveRequests();
+    unsigned int testReceiveRequests(unsigned int thread_id);
 
     unsigned int testSendRequests(unsigned int thread_id);
 

@@ -43,7 +43,7 @@ public:
 
     virtual void sendMessage(std::unique_ptr<TimeWarpKernelMessage> msg) = 0;
 
-    virtual bool handleReceives() = 0;
+    virtual bool handleReceives(unsigned int thread_id) = 0;
 
     // Adds a MessageType/Message handler pair for dispatching messages
     void addRecvMessageHandler(MessageType msg_type,
