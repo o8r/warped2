@@ -37,6 +37,9 @@ implementation you are currently using.");
     send_queue_->pending_request_list_ = make_unique<std::vector<std::unique_ptr<PendingRequest>>[]>(num_worker_threads_+1);
     recv_queue_->pending_request_list_ = make_unique<std::vector<std::unique_ptr<PendingRequest>>[]>(num_worker_threads_+1);
 
+    MPI_Comm_rank(MPI_COMM_WORLD, &my_rank_);
+    MPI_Comm_size(MPI_COMM_WORLD, &num_processes_);
+
     return getNumProcesses();
 }
 
@@ -45,15 +48,11 @@ void TimeWarpMPICommunicationManager::finalize() {
 }
 
 unsigned int TimeWarpMPICommunicationManager::getNumProcesses() {
-    int size = 0;
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
-    return size;
+    return num_processes_;
 }
 
 unsigned int TimeWarpMPICommunicationManager::getID() {
-    int id = 0;
-    MPI_Comm_rank(MPI_COMM_WORLD, &id);
-    return id;
+    return my_rank_;
 }
 
 int TimeWarpMPICommunicationManager::waitForAllProcesses() {

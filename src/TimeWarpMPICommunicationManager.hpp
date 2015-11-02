@@ -58,6 +58,9 @@ private:
 
     std::shared_ptr<MessageQueue> send_queue_;
     std::shared_ptr<MessageQueue> recv_queue_;
+
+    int my_rank_;
+    int num_processes_;
 };
 
 struct PendingRequest {
