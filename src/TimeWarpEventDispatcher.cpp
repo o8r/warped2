@@ -182,7 +182,8 @@ void TimeWarpEventDispatcher::processEvents(unsigned int id, const std::vector<L
         //  "simultaneous reporting problem"
         local_gvt_flag = local_gvt_manager_->getLocalGVTFlag();
 
-        comm_manager_->handleReceives(thread_id);
+        if (comm_manager_->getNumProcesses() > 1)
+            comm_manager_->handleReceives(thread_id);
 
         std::shared_ptr<Event> event = event_set_->getEvent(thread_id);
         if (event != nullptr) {
