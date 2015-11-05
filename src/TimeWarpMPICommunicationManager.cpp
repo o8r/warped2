@@ -11,8 +11,6 @@
 
 namespace warped {
 
-TicketLock serialization_lock;
-
 unsigned int TimeWarpMPICommunicationManager::initialize() {
 
     // MPI_Init requires command line arguments, but doesn't use them. Just give
@@ -84,11 +82,9 @@ void TimeWarpMPICommunicationManager::sendMessage(std::unique_ptr<TimeWarpKernel
 
     testSendRequests(thread_id);
 
-//    serialization_lock.lock();
     std::ostringstream oss;
     cereal::PortableBinaryOutputArchive oarchive(oss);
     oarchive(std::move(msg));
-//    serialization_lock.unlock();
 
     auto new_request = make_unique<PendingRequest>(make_unique<uint8_t[]>(max_buffer_size_));
     std::memcpy(new_request->buffer_.get(), oss.str().c_str(), oss.str().length()+1);
@@ -183,17 +179,16 @@ unsigned int TimeWarpMPICommunicationManager::testReceiveRequests(unsigned int t
 
     for (auto& pr : recv_queue_->pending_request_list_[thread_id]) {
         MPI_Test(&pr->request_, &pr->flag_, &pr->status_);
-        if (pr->flag_ != 0) {
+    }
 
+    for (auto& pr : recv_queue_->pending_request_list_[thread_id]) {
+        if (pr->flag_ != 0) {
             requests_completed++;
 
             std::unique_ptr<TimeWarpKernelMessage> msg = nullptr;
-
-//            serialization_lock.lock();
             std::istringstream iss(std::string(reinterpret_cast<char*>(pr->buffer_.get()), max_buffer_size_));
             cereal::PortableBinaryInputArchive iarchive(iss);
             iarchive(msg);
-//            serialization_lock.unlock();
 
             MessageType msg_type = msg->get_type();
             int msg_type_int = static_cast<int>(msg_type);

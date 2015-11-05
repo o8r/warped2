@@ -8,7 +8,6 @@
 
 #include "TimeWarpCommunicationManager.hpp"
 #include "TimeWarpKernelMessage.hpp"
-#include "TicketLock.hpp"
 
 namespace warped {
 
