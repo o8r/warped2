@@ -36,7 +36,6 @@ WARPED_NOINST_HPP_FILES = \
 	src/RandomNumberGenerator.hpp \
     src/TimeWarpEventDispatcher.hpp \
     src/utility/strings.hpp \
-	src/SpinningThreadBarrier.hpp \
 	src/TicketLock.hpp \
     src/TimeWarpMatternGVTManager.hpp \
     src/TimeWarpKernelMessage.hpp \

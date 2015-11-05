@@ -25,7 +25,6 @@
 #include "LTSFQueue.hpp"
 #include "Partitioner.hpp"
 #include "LogicalProcess.hpp"
-#include "SpinningThreadBarrier.hpp"
 #include "TimeWarpMPICommunicationManager.hpp"
 #include "TimeWarpMatternGVTManager.hpp"
 #include "TimeWarpLocalGVTManager.hpp"
@@ -43,7 +42,7 @@ WARPED_REGISTER_POLYMORPHIC_SERIALIZABLE_CLASS(warped::NegativeEvent)
 namespace warped {
 
 thread_local unsigned int TimeWarpEventDispatcher::thread_id;
-SpinningThreadBarrier start_barrier;
+pthread_barrier_t start_barrier;
 
 TimeWarpEventDispatcher::TimeWarpEventDispatcher(unsigned int max_sim_time,
     unsigned int num_worker_threads,
@@ -69,7 +68,7 @@ void TimeWarpEventDispatcher::startSimulation(const std::vector<std::vector<Logi
                                               lps) {
     initialize(lps);
 
-    start_barrier.init(num_worker_threads_);
+    pthread_barrier_init(&start_barrier, NULL, num_worker_threads_);
 
     // Create worker threads
     std::vector<std::thread> threads;
@@ -167,7 +166,7 @@ void TimeWarpEventDispatcher::processEvents(unsigned int id, const std::vector<L
     unsigned int local_gvt_flag;
     unsigned int gvt = 0;
 
-    start_barrier.wait();
+    pthread_barrier_wait(&start_barrier);
     auto initial_event = std::make_shared<InitialEvent>();
     for (auto& lp : lps) {
         unsigned int lp_id = local_lp_id_by_name_[lp->name_];
@@ -175,7 +174,7 @@ void TimeWarpEventDispatcher::processEvents(unsigned int id, const std::vector<L
         sendEvents(initial_event, new_events, lp_id, lp);
         state_manager_->saveState(initial_event, lp_id, lp);
     }
-    start_barrier.wait();
+    pthread_barrier_wait(&start_barrier);
 
     while (!termination_manager_->terminationStatus()) {
         // NOTE: local_gvt_flag must be obtained before getting the next event to avoid the
