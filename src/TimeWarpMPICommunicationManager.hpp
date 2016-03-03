@@ -17,6 +17,12 @@ struct MPIRecvQueue;
 
 #define MPI_DATA_TAG        729
 
+  namespace detail {
+    template <typename T> struct MpiDataType;
+    template <> struct MpiDataType<uint64_t> { static constexpr MPI_Datatype value = MPI_UINT64_T; };
+    template <> struct MpiDataType<double> { static constexpr MPI_Datatype value = MPI_DOUBLE; };
+  }  // detail
+
 class TimeWarpMPICommunicationManager : public TimeWarpCommunicationManager {
 public:
     TimeWarpMPICommunicationManager(unsigned int max_buffer_size, unsigned max_aggregate) :
@@ -34,6 +40,7 @@ public:
 
     int sumReduceUint64(uint64_t* send_local, uint64_t* recv_global);
     int gatherUint64(uint64_t* send_local, uint64_t* recv_root);
+    double gatherDouble(double* send_local, double* recv_root) { return gather(send_local, recv_root); }
     int sumAllReduceInt64(int64_t* send_local, int64_t* recv_global);
     int minAllReduceUint(unsigned int* send_local, unsigned int* recv_global);
 
@@ -48,6 +55,11 @@ protected:
     bool isInitiatingThread();
 
 private:
+    template <typename T>
+    T gather(T* send_local, T* recv_root) {
+      return MPI_Gather(send_local, 1, detail::MpiDataType<T>::value, recv_root, 1, detail::MpiDataType<T>::value, 0, MPI_COMM_WORLD);
+    }
+
     unsigned int max_buffer_size_;
     unsigned int max_aggregate_;
 

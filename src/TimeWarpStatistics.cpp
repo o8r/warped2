@@ -95,6 +95,13 @@ void TimeWarpStatistics::calculateStats() {
                     static_cast<double>(global_stats_[EVENTS_COMMITTED]) /
                     static_cast<double>(global_stats_[EVENTS_PROCESSED]);
                 break;
+            case ROLLBACK_TIME.value:
+                sumReduceLocal(ROLLBACK_TIME, rollback_time_by_node_);
+                break;
+            case RECOVERY_TIME.value:
+                sumReduceLocal(RECOVERY_TIME, recovery_time_by_node_);
+                break;
+
             default:
                 break;
         }
@@ -121,7 +128,10 @@ void TimeWarpStatistics::writeToFile(double num_seconds) {
             << coast_forward_events_by_node_[i] << ",\t"
             << cancelled_events_by_node_[i]     << ",\t"
             << processed_events_by_node_[i]     << ",\t"
-            << committed_events_by_node_[i]     << std::endl;
+            << committed_events_by_node_[i]     << ",\t"
+	    << rollback_time_by_node_[i]        << ",\t"
+	    << recovery_time_by_node_[i]        
+	    << std::endl;
     }
 
     ofs << "Total"                                    << ",\t"
@@ -137,7 +147,10 @@ void TimeWarpStatistics::writeToFile(double num_seconds) {
         << global_stats_[CANCELLED_EVENTS]            << ",\t"
         << global_stats_[EVENTS_PROCESSED]            << ",\t"
         << global_stats_[EVENTS_COMMITTED]            << ",\t"
-        << global_stats_[AVERAGE_MAX_MEMORY]           << std::endl;
+        << global_stats_[AVERAGE_MAX_MEMORY]          << ",\t"
+        << global_stats_[ROLLBACK_TIME]               << ",\t"
+	<< global_stats_[RECOVERY_TIME]
+	<< std::endl;
 
     ofs.close();
 }
@@ -171,7 +184,12 @@ void TimeWarpStatistics::printStats() {
               << "\tEfficiency:                " << global_stats_[EFFICIENCY]*100.0 << "%\n\n"
 
               << "\tAverage maximum memory:    " << global_stats_[AVERAGE_MAX_MEMORY] << " MB\n"
-              << "\tGVT cycles:                " << global_stats_[GVT_CYCLES] << std::endl << std::endl;
+              << "\tGVT cycles:                " << global_stats_[GVT_CYCLES] 
+
+	      << "\tAverage time for rollback: " << global_stats_[ROLLBACK_TIME] << " sec\n"
+	      << "\tAverage time for recovery: " << global_stats_[RECOVERY_TIME] << " sec\n"
+
+	      << std::endl;
 
     delete [] local_pos_sent_by_node_;
     delete [] local_neg_sent_by_node_;
@@ -185,6 +203,8 @@ void TimeWarpStatistics::printStats() {
     delete [] num_objects_by_node_;
     delete [] processed_events_by_node_;
     delete [] committed_events_by_node_;
+    delete [] rollback_time_by_node_;
+    delete [] recovery_time_by_node_;
 }
 
 } // namespace warped

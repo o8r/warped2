@@ -342,6 +342,7 @@ void TimeWarpEventDispatcher::cancelEvents(
 }
 
 void TimeWarpEventDispatcher::rollback(std::shared_ptr<Event> straggler_event) {
+    auto start = std::chrono::steady_clock::now();
 
     unsigned int local_lp_id = local_lp_id_by_name_[straggler_event->receiverName()];
     LogicalProcess* current_lp = lps_by_name_[straggler_event->receiverName()];
@@ -376,7 +377,20 @@ void TimeWarpEventDispatcher::rollback(std::shared_ptr<Event> straggler_event) {
         cancelEvents(std::move(events_to_cancel));
     }
 
+    auto stop = std::chrono::steady_clock::now();
+
+    double num_seconds = double((stop - start).count()) *
+                std::chrono::steady_clock::period::num / std::chrono::steady_clock::period::den;
+    auto c = tw_stats_->getLocal(PRIMARY_ROLLBACKS, thread_id);
+    c += tw_stats_->getLocal(SECONDARY_ROLLBACKS, thread_id);
+    tw_stats_->updateLocalAverage(ROLLBACK_TIME, thread_id, num_seconds, c);
+
+    start = std::chrono::steady_clock::now();
     coastForward(straggler_event, restored_state_event);
+    stop = std::chrono::steady_clock::now();
+    num_seconds = double((stop - start).count()) *
+      std::chrono::steady_clock::period::num / std::chrono::steady_clock::period::den;
+    tw_stats_->updateLocalAverage(RECOVERY_TIME, thread_id, num_seconds, c);
 }
 
 void TimeWarpEventDispatcher::coastForward(std::shared_ptr<Event> straggler_event, 

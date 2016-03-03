@@ -39,6 +39,12 @@ public:
 
     virtual int gatherUint64(uint64_t* send_local, uint64_t* recv_root) = 0;
 
+    /** Gather double.
+     * @author O'HARA Mamoru
+     * @date 2016 Mar 3
+     */
+    virtual double gatherDouble(double* send_local, double* recv_root) = 0;
+
     virtual int sumAllReduceInt64(int64_t* send_local, int64_t* recv_global) = 0;
 
     virtual int minAllReduceUint(unsigned int* send_local, unsigned int* recv_global) = 0;

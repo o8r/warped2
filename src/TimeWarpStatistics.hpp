@@ -4,6 +4,7 @@
 #include <memory>   // for unique_ptr
 #include <cstdint>  // uint64_t
 #include <tuple>
+#include <type_traits>  /* for remove_reference */
 
 #include "TimeWarpCommunicationManager.hpp"
 
@@ -39,14 +40,16 @@ struct Stats {
         uint64_t,                   // Rolled back events           18
         double,                     // Average Rollback Length      19
         double,                     // Efficiency                   20
-        uint64_t                    // dummy/number of elements     21
+        double,                     // Time for positive events     21
+        double,                     // Time for rollback            22
+        double,                     // Time for recovery            23
+        uint64_t                    // dummy/number of elements     24
     > stats_;
 
     template<unsigned I>
     auto operator[](stats_index<I>) -> decltype(std::get<I>(stats_)) {
         return std::get<I>(stats_);
     }
-
 };
 
 const stats_index<0> LOCAL_POSITIVE_EVENTS_SENT;
@@ -70,7 +73,10 @@ const stats_index<17> NUM_OBJECTS;
 const stats_index<18> EVENTS_ROLLEDBACK;
 const stats_index<19> AVERAGE_RBLENGTH;
 const stats_index<20> EFFICIENCY;
-const stats_index<21> NUM_STATISTICS;
+const stats_index<21> POSITIVE_TIME;
+const stats_index<22> ROLLBACK_TIME;
+const stats_index<23> RECOVERY_TIME;
+const stats_index<24> NUM_STATISTICS;
 
 class TimeWarpStatistics {
 public:
@@ -80,9 +86,27 @@ public:
 
     void initialize(unsigned int num_worker_threads, unsigned int num_objects);
 
+    /** returns statistics counter value.
+     * @author O'HARA Mamoru
+     * @date 2016 Mar 3
+     */
+    template <unsigned I>
+    auto getLocal(stats_index<I> i, unsigned int thread_id) const -> decltype(Stats()[i]) {
+	return local_stats_[thread_id][i];
+    }
+
     template <unsigned I>
     void updateAverage(stats_index<I> i, uint64_t new_val, unsigned int count) {
         global_stats_[i] = (new_val + (count - 1) * global_stats_[i]) / (count);
+    }
+
+    /** update local average.
+     * @author O'HARA Mamoru
+     * @date 2016 Mar 3
+     */
+    template <unsigned I>
+    void updateLocalAverage(stats_index<I> i, unsigned int thread_id, decltype(Stats()[i]) new_val, unsigned int count) {
+        local_stats_[thread_id][i] = (new_val + (count-1) * local_stats_[thread_id][i]) / (count);
     }
 
     template <unsigned I>
@@ -92,15 +116,16 @@ public:
     }
 
     template <unsigned I>
-    void sumReduceLocal(stats_index<I> j, uint64_t *&recv_array) {
-        uint64_t local_count = 0;
+    void sumReduceLocal(stats_index<I> j, typename std::remove_reference<decltype(Stats()[j])>::type *recv_array) {
+      using value_type = typename std::remove_const<typename std::remove_reference<decltype(Stats()[j])>::type>::type;
+        value_type local_count = 0;
 
         for (unsigned int i = 0; i < num_worker_threads_+1; i++) {
             local_count += local_stats_[i][j];
         }
 
-        recv_array = new uint64_t[comm_manager_->getNumProcesses()];
-        comm_manager_->gatherUint64(&local_count, recv_array);
+        recv_array = new value_type[comm_manager_->getNumProcesses()];
+        gather(&local_count, recv_array);
 
         for (unsigned int i = 0; i < comm_manager_->getNumProcesses(); i++) {
             global_stats_[j] += recv_array[i];
@@ -114,6 +139,8 @@ public:
     void printStats();
 
 private:
+    uint64_t gather(uint64_t* send_local, uint64_t* recv_root) { return comm_manager_->gatherUint64(send_local, recv_root); }
+    double gather(double* send_local, double* recv_root) { return comm_manager_->gatherDouble(send_local, recv_root); }
 
     std::unique_ptr<Stats []> local_stats_;
     Stats global_stats_;
@@ -130,6 +157,8 @@ private:
     uint64_t *committed_events_by_node_;
     uint64_t *total_events_received_by_node_;
     uint64_t *num_objects_by_node_;
+    double* rollback_time_by_node_;
+    double* recovery_time_by_node_;
 
     std::shared_ptr<TimeWarpCommunicationManager> comm_manager_;
 
