@@ -121,7 +121,7 @@ namespace cereal {
 
       std::string json;
       ar(json);
-      auto root = warped::make_unique<Json::Value>(json);
+      std::unique_ptr<Json::Value> root{ new Json::Value(json) };
       construct->root_ = std::move(root);
     }
   };
