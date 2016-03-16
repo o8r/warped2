@@ -5,7 +5,6 @@
 
 #include "Configuration.hpp"
 // for serialization
-#include "serialization_Configuration.hpp"
 #include "TimeWarpCommunicationManager.hpp" 
 #include "TimeWarpEventSet.hpp"
 #include "TimeWarpGVTManager.hpp"
