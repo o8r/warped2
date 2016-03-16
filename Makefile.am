@@ -7,7 +7,6 @@ lib_LTLIBRARIES = libwarped.la
 # sorted.
 WARPED_INSTALL_HPP_FILES = \
     src/Configuration.hpp \
-	src/serialization_Configuration.hpp \
     src/FileStream.hpp \
     src/Event.hpp \
     src/LogicalProcess.hpp \
