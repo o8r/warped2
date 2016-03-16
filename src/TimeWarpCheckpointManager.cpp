@@ -1,9 +1,11 @@
 #include "TimeWarpCheckpointManager.hpp"
 
+#include <chrono>
 #include <cassert>
 
 #include "Configuration.hpp"
 // for serialization
+#include "serialization_Configuration.hpp"
 #include "TimeWarpCommunicationManager.hpp" 
 #include "TimeWarpEventSet.hpp"
 #include "TimeWarpGVTManager.hpp"
@@ -113,8 +115,12 @@ warped::TimeWarpCheckpointManager::generateCheckpoint()
 {
   assert(pimpl_ && !pimpl_->filepath.empty());
 
+  auto now = std::chrono::steady_clock::now();
+
   std::ofstream ofs { pimpl_->filepath, std::ios_base::out | std::ios_base::trunc };
   cereal::PortableBinaryOutputArchive ar { ofs };
+
+  ar(now);
 
   ar(pimpl_->configuration, *pimpl_->comm_manager, *pimpl_->event_set, *pimpl_->gvt_manager,
      *pimpl_->state_manager, *pimpl_->output_manager, *pimpl_->twfs_manager, *pimpl_->termination_manager,

@@ -9,6 +9,7 @@
 #include "LogicalProcess.hpp"
 #include "TimeWarpKernelMessage.hpp"
 #include "utility/memory.hpp"
+#include "serialization.hpp"
 
 /* This class is a base class for any specific communication protocol. Any subclass must
  * implement methods to initialize communication, finalize communication, get the number of
@@ -72,6 +73,15 @@ protected:
 private:
     std::unordered_map<std::string, unsigned int> node_id_by_lp_name_;
 
+    friend class cereal::access;
+    template <typename Archive>
+    void save(Archive& ar) const {
+      ar(node_id_by_lp_name_);
+    }
+    template <typename Archive>
+    void load(Archive& ar) {
+      ar(node_id_by_lp_name_);
+    }
 };
 
 } // namespace warped

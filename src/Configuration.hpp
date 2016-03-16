@@ -3,10 +3,12 @@
 
 #include <memory>
 #include <string>
+#include <sstream>
 #include <vector>
 
 namespace TCLAP { class Arg; }
 namespace Json { class Value; }
+namespace cereal { class access; }
 
 namespace warped {
 
@@ -29,6 +31,13 @@ public:
     Configuration(const std::string& config_file_name, unsigned int max_time);
     ~Configuration();
 
+    /** Copy ctor and assignment.
+     * @author O'HARA Mamoru
+     * @date 2016 Mar 11
+     */
+    Configuration(Configuration const& other);
+    Configuration& operator=(Configuration const& other);
+
     // Create a fully configured EventDispatcher
     std::unique_ptr<EventDispatcher>
     makeDispatcher(std::shared_ptr<TimeWarpCommunicationManager> comm_manager);
@@ -49,6 +58,7 @@ public:
     bool checkTimeWarpConfigs(uint64_t local_config_id, uint64_t *all_config_ids,
         std::shared_ptr<TimeWarpCommunicationManager> comm_manager);
 
+    bool isRestarting() const;
 private:
     void init(const std::string& model_description, int argc, const char* const* argv,
               const std::vector<TCLAP::Arg*>& cmd_line_args);
@@ -57,6 +67,16 @@ private:
     std::string config_file_name_;
     unsigned int max_sim_time_;
     std::unique_ptr<Json::Value> root_;
+
+    friend class cereal::access;
+    template <typename Archive> friend void save(Archive&, Configuration const&);
+    template <typename Archive> friend void load(Archive&, Configuration&);
+public:
+    /** returns reference to root of configuration tree.
+     * @author O'HARA Mamoru
+     * @date 2016 Mar 9
+     */
+    Json::Value const& root() const { return *root_; }
 };
 
 } // namespace warped

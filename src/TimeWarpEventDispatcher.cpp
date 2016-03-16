@@ -30,6 +30,8 @@
 #include "TimeWarpFileStreamManager.hpp"
 #include "TimeWarpTerminationManager.hpp"
 #include "TimeWarpEventSet.hpp"
+#include "TimeWarpCheckpointManager.hpp"
+#include "serialization.hpp"
 #include "utility/memory.hpp"
 #include "utility/warnings.hpp"
 
@@ -51,13 +53,17 @@ TimeWarpEventDispatcher::TimeWarpEventDispatcher(unsigned int max_sim_time,
     std::unique_ptr<TimeWarpOutputManager> output_manager,
     std::unique_ptr<TimeWarpFileStreamManager> twfs_manager,
     std::unique_ptr<TimeWarpTerminationManager> termination_manager,
-    std::unique_ptr<TimeWarpStatistics> tw_stats) :
+    std::unique_ptr<TimeWarpStatistics> tw_stats,
+    std::unique_ptr<TimeWarpCheckpointManager> checkpoint_manager)
+ :
         EventDispatcher(max_sim_time), num_worker_threads_(num_worker_threads),
         is_lp_migration_on_(is_lp_migration_on), 
         comm_manager_(comm_manager), event_set_(std::move(event_set)), 
         gvt_manager_(std::move(gvt_manager)), state_manager_(std::move(state_manager)),
         output_manager_(std::move(output_manager)), twfs_manager_(std::move(twfs_manager)),
-        termination_manager_(std::move(termination_manager)), tw_stats_(std::move(tw_stats)) {}
+        termination_manager_(std::move(termination_manager)), tw_stats_(std::move(tw_stats)),
+	checkpoint_manager_(std::move(checkpoint_manager))
+{}
 
 void TimeWarpEventDispatcher::startSimulation(const std::vector<std::vector<LogicalProcess*>>&
                                               lps) {
@@ -120,6 +126,77 @@ void TimeWarpEventDispatcher::startSimulation(const std::vector<std::vector<Logi
     }
 }
 
+void TimeWarpEventDispatcher::restart(std::vector<LogicalProcess*> const& lps, cereal::PortableBinaryInputArchive& ar)
+{
+  ar(*event_set_, *gvt_manager_, *state_manager_, *output_manager_,
+     *twfs_manager_, *termination_manager_, *tw_stats_);
+
+  // restore LPStates
+  unsigned int lp_id = 0;
+  for (LogicalProcess* lp: lps) {
+    ar(*lp);
+
+    lps_by_name_[lp->name_] = lp;
+    local_lp_id_by_name_[lp->name_] = lp_id;
+    lp_id++;
+  }
+
+    // Create worker threads
+    std::vector<std::thread> threads;
+    for (unsigned int i = 0; i < num_worker_threads_; ++i) {
+        auto thread(std::thread {&TimeWarpEventDispatcher::processEvents, this, i});
+        threads.push_back(std::move(thread));
+    }
+
+    auto sim_start = std::chrono::steady_clock::now();
+
+    // Master thread main loop
+    while (!termination_manager_->terminationStatus()) {
+
+        comm_manager_->handleMessages();
+
+        // Check to see if we should start/continue the termination process
+        if (termination_manager_->nodePassive()) {
+            termination_manager_->sendTerminationToken(State::PASSIVE, comm_manager_->getID(), 0);
+        }
+
+        gvt_manager_->checkProgressGVT();
+
+        if (gvt_manager_->gvtUpdated()) {
+            auto gvt = gvt_manager_->getGVT();
+            onGVT(gvt);
+        }
+
+    }
+
+    comm_manager_->waitForAllProcesses();
+    auto sim_stop = std::chrono::steady_clock::now();
+
+    double num_seconds = double((sim_stop - sim_start).count()) *
+                std::chrono::steady_clock::period::num / std::chrono::steady_clock::period::den;
+
+    if (comm_manager_->getID() == 0) {
+        std::cout << "\nSimulation completed in " << num_seconds << " second(s)" << "\n\n";
+    }
+
+    for (auto& t: threads) {
+        t.join();
+    }
+
+    auto gvt = (unsigned int)-1;
+    for (unsigned int current_lp_id = 0; current_lp_id < num_local_lps_; current_lp_id++) {
+        unsigned int num_committed = event_set_->fossilCollect(gvt, current_lp_id);
+        tw_stats_->upCount(EVENTS_COMMITTED, thread_id, num_committed);
+    }
+
+    tw_stats_->calculateStats();
+
+    if (comm_manager_->getID() == 0) {
+        tw_stats_->writeToFile(num_seconds);
+        tw_stats_->printStats();
+    }
+}
+
 void TimeWarpEventDispatcher::onGVT(unsigned int gvt) {
     auto malloc_info = mallinfo();
     int m = malloc_info.uordblks;
@@ -135,6 +212,8 @@ void TimeWarpEventDispatcher::onGVT(unsigned int gvt) {
 
     uint64_t c = tw_stats_->upCount(GVT_CYCLES, num_worker_threads_);
     tw_stats_->updateAverage(AVERAGE_MAX_MEMORY, mem, c);
+
+    checkpoint_manager_->notifyGVTUpdate(gvt);
 }
 
 void TimeWarpEventDispatcher::processEvents(unsigned int id) {
@@ -217,6 +296,8 @@ void TimeWarpEventDispatcher::processEvents(unsigned int id) {
 
             // Save state
             state_manager_->saveState(event, current_lp_id, current_lp);
+	    
+	    checkpoint_manager_->notifyEvent(event);
 
             // Send new events
             sendEvents(event, new_events, current_lp_id, current_lp);
@@ -254,6 +335,8 @@ void TimeWarpEventDispatcher::processEvents(unsigned int id) {
             // We must have this so that the GVT calculations can continue with passive threads.
             // Just report infinite for a time.
             gvt_manager_->reportThreadMin((unsigned int)-1, thread_id, local_gvt_flag);
+
+	    checkpoint_manager_->notifyPassive();
         }
     }
 }
@@ -451,6 +534,15 @@ TimeWarpEventDispatcher::initialize(const std::vector<std::vector<LogicalProcess
 
     // Initialize statistics data structures
     tw_stats_->initialize(num_worker_threads_, num_local_lps_);
+
+    // Checkpoint Manager
+    std::vector<LogicalProcess*> flattened_lps;
+    for (auto& partition : lps)
+      flattened_lps.insert(end(flattened_lps), begin(partition), end(partition));
+    checkpoint_manager_->initialize(num_worker_threads_, flattened_lps,
+				    *comm_manager_, *event_set_, *gvt_manager_, *state_manager_,
+				    *output_manager_, *twfs_manager_, *termination_manager_,
+				    *tw_stats_);
 
     comm_manager_->waitForAllProcesses();
 

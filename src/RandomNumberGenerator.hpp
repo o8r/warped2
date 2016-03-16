@@ -3,6 +3,8 @@
 
 #include <memory>
 
+#include "serialization.hpp"
+
 namespace warped {
 
 struct RandomNumberGenerator {
@@ -26,6 +28,21 @@ template<class RNGType>
 struct RNGDerived : public RNGMixin<RNGDerived<RNGType>> {
     RNGDerived(std::shared_ptr<RNGType> gen) : gen_(gen) {}
     std::shared_ptr<RNGType> gen_;
+
+    template <typename Archive>
+    void save(Archive& ar) const {
+      ar(gen_);
+    }
+    template <typename Archive>
+    void load(Archive& ar) {
+      ar(gen_);
+    }
+    template <typename Archive>
+    static void load_and_construct(Archive& ar, cereal::construct<RNGDerived>& construct) {
+      std::shared_ptr<RNGType> gen;
+      ar(gen);
+      construct(gen);
+    }
 };
 
 } // namespace warped

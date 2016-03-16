@@ -8,6 +8,7 @@
 #include <cassert>
 
 #include "Configuration.hpp"
+#include "json/json.h"  /* for Json::Value */
 
 //////////////////////////////////////////////////////////////////////
 // GVTSynchronizationCheckpointManager::Impl
@@ -61,7 +62,7 @@ warped::GVTSynchronizedCheckpointManager::onGVT(unsigned int /*gvt*/)
 }
 
 void
-warped::GVTSynchronizedCheckpointManager::generateCheckpoint()
+warped::GVTSynchronizedCheckpointManager::doGenerateCheckpoint(cereal::PortableBinaryOutputArchive&)
 {
   pimpl_->remaining = pimpl_->interval;
 }

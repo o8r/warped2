@@ -13,6 +13,17 @@ struct LPState {
     virtual ~LPState() {}
     virtual std::unique_ptr<LPState> clone() const = 0;
     virtual void restoreState(LPState& os) = 0;
+
+    template <typename Archive>
+    void save(Archive& ar) const {
+      ar(clone());
+    }
+    template <typename Archive>
+    void load(Archive& ar) {
+      std::unique_ptr<LPState> state;
+      ar(state);
+      restoreState(*state);
+    }
 };
 
 // This mixin uses CRTP to define the clone method for any copy-constructable

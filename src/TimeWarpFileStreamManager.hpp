@@ -9,6 +9,7 @@
 
 #include "TimeWarpFileStream.hpp"
 #include "LogicalProcess.hpp"
+#include "serialization.hpp"
 
 /* This class manages TimeWarpFileStreams for each lp. Only one lp of this class is needed
  * per node and is used only by TimeWarpEventDispatcher.
@@ -49,6 +50,12 @@ private:
     std::unordered_map<std::string, TimeWarpFileStream*> file_stream_by_filename_;
 
     unsigned int num_local_lps_;
+
+    friend class cereal::access;
+    template <typename Archive>
+    void serialize(Archive& /*ar*/) {
+      // ToDo: implement this
+    }
 };
 
 } // namespace warped

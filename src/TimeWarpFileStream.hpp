@@ -10,6 +10,7 @@
 #include "TimeWarpFileStreamManager.hpp"
 #include "LogicalProcess.hpp"
 #include "FileStream.hpp"
+#include "serialization.hpp"
 
 /* This is a sub class of FileStream which will override all of the output methods. In the time
  * warp mechanism, output cannot be commited until GVT passes the lvt of each lp. Instead of
@@ -76,6 +77,11 @@ private:
 
     std::shared_ptr<Event> current_event_;
 
+    friend class cereal::access;
+    template <typename Archive>
+    void serialize(Archive& ar) {
+      ar(output_requests_, current_event_);
+    }
 };
 
 } // namespace warped

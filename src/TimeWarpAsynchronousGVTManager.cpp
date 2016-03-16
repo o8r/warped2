@@ -5,6 +5,7 @@
 #include "utility/warnings.hpp"
 #include "utility/memory.hpp"           // for make_unique
 
+WARPED_REGISTER_POLYMORPHIC_SERIALIZABLE_CLASS(warped::TimeWarpAsynchronousGVTManager)
 WARPED_REGISTER_POLYMORPHIC_SERIALIZABLE_CLASS(warped::MatternGVTToken)
 WARPED_REGISTER_POLYMORPHIC_SERIALIZABLE_CLASS(warped::GVTUpdateMessage)
 

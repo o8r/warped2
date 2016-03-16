@@ -2,6 +2,8 @@
 
 #include <memory>
 #include <vector>
+#include <fstream>
+#include <sstream>
 #include <tuple>
 #include <algorithm>
 
@@ -10,6 +12,8 @@
 #include "Partitioner.hpp"
 #include "LogicalProcess.hpp"
 #include "TimeWarpMPICommunicationManager.hpp"
+#include "serialization.hpp"
+#include "json/json.h"
 
 extern "C" {
     void warped_is_present(void) {
@@ -35,46 +39,84 @@ void Simulation::simulate(const std::vector<LogicalProcess*>& lps) {
     check(lps);
 
     auto comm_manager = config_.makeCommunicationManager();
-
     unsigned int num_partitions = comm_manager->initialize();
-    auto partitioned_lps = config_.makePartitioner()->partition(lps, num_partitions);
-    comm_manager->initializeLPMap(partitioned_lps);
 
-    comm_manager->waitForAllProcesses();
-
-    unsigned int num_schedulers = num_partitions;
-    auto local_partitioner = config_.makeLocalPartitioner(comm_manager->getID(), num_schedulers);
-    auto local_partitions =
+    if (config_.isRestarting()) {
+      restart(lps, comm_manager);
+    } else {
+      auto partitioned_lps = config_.makePartitioner()->partition(lps, num_partitions);
+      comm_manager->initializeLPMap(partitioned_lps);
+      
+      comm_manager->waitForAllProcesses();
+      
+      unsigned int num_schedulers = num_partitions;
+      auto local_partitioner = config_.makeLocalPartitioner(comm_manager->getID(), num_schedulers);
+      auto local_partitions =
         local_partitioner->partition(partitioned_lps[comm_manager->getID()], num_schedulers);
-
-    event_dispatcher_ = config_.makeDispatcher(comm_manager);
-    event_dispatcher_->startSimulation(local_partitions);
+      
+      event_dispatcher_ = config_.makeDispatcher(comm_manager);
+      
+      event_dispatcher_->startSimulation(local_partitions);
+    }
 
     comm_manager->finalize();
 }
 
 void Simulation::simulate(const std::vector<LogicalProcess*>& lps,
     std::unique_ptr<Partitioner> partitioner) {
-
     check(lps);
+
     auto comm_manager = config_.makeCommunicationManager();
-
     unsigned int num_partitions = comm_manager->initialize();
-    auto partitioned_lps =
+
+    if (config_.isRestarting()) {
+      restart(lps, comm_manager);
+    } else {
+      auto partitioned_lps =
         config_.makePartitioner(std::move(partitioner))->partition(lps, num_partitions);
-    comm_manager->initializeLPMap(partitioned_lps);
-
-    comm_manager->waitForAllProcesses();
-
-    unsigned int num_schedulers = num_partitions;
-    auto local_partitioner = config_.makeLocalPartitioner(comm_manager->getID(), num_schedulers);
-    auto local_partitions =
+      comm_manager->initializeLPMap(partitioned_lps);
+      
+      comm_manager->waitForAllProcesses();
+      
+      unsigned int num_schedulers = num_partitions;
+      auto local_partitioner = config_.makeLocalPartitioner(comm_manager->getID(), num_schedulers);
+      auto local_partitions =
         local_partitioner->partition(partitioned_lps[comm_manager->getID()], num_schedulers);
+      
+      event_dispatcher_ = config_.makeDispatcher(comm_manager);
 
-    event_dispatcher_ = config_.makeDispatcher(comm_manager);
-    event_dispatcher_->startSimulation(local_partitions);
+      event_dispatcher_->startSimulation(local_partitions);
+    }
 
     comm_manager->finalize();
+}
+
+void Simulation::restart(const std::vector<LogicalProcess*>& lps, std::shared_ptr<TimeWarpCommunicationManager> comm_manager)
+{
+  auto file = config_.root()["checkpointing"]["file"];
+  if (file.empty()) file = "checkpoint";
+
+  auto id = comm_manager->getID();
+  std::ostringstream filename;
+  filename << file << "." << id;
+
+  // Open the checkpoint file
+  std::ifstream ifs { filename.str() };
+  cereal::PortableBinaryInputArchive ar { ifs };
+
+  // Restore the time from which rejuvenation started
+  std::chrono::time_point<std::chrono::steady_clock> started;
+  ar(started);
+
+  // Restore Configuration
+  ar(config_);
+
+  // Restore CommunicationManager
+  ar(*comm_manager);
+
+  // make EventDispacher
+  event_dispatcher_ = config_.makeDispatcher(comm_manager);
+  event_dispatcher_->restart(lps, ar);
 }
 
 void Simulation::check(const std::vector<LogicalProcess*>& lps) {

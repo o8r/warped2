@@ -5,6 +5,8 @@
 #include "utility/warnings.hpp"
 #include "utility/memory.hpp"           // for make_unique
 
+WARPED_REGISTER_POLYMORPHIC_SERIALIZABLE_CLASS(warped::TimeWarpSynchronousGVTManager)
+
 namespace warped {
 
 enum class Color;

@@ -19,6 +19,7 @@
 #include "TicketLock.hpp"
 #include "LadderQueue.hpp"
 #include "SplayTree.hpp"
+#include "serialization.hpp"
 
 namespace warped {
 
@@ -108,6 +109,20 @@ private:
 
     // Event scheduled from all lps
     std::vector<std::shared_ptr<Event>> scheduled_event_pointer_;
+
+    friend class cereal::access;
+    template <typename Archive>
+    void serialize(Archive& ar) {
+      ar(num_of_lps_, 
+	 input_queue_, processed_queue_,
+	 num_of_schedulers_,
+	 schedule_queue_,
+	 input_queue_scheduler_map_,
+	 is_lp_migration_on_,
+	 worker_thread_scheduler_map_,
+	 scheduled_event_pointer_
+	 );
+    }
 };
 
 } // warped namespace

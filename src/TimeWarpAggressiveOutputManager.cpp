@@ -1,5 +1,7 @@
 #include "TimeWarpAggressiveOutputManager.hpp"
 
+WARPED_REGISTER_POLYMORPHIC_SERIALIZABLE_CLASS(warped::TimeWarpAggressiveOutputManager)
+
 namespace warped {
 
 // For aggressive cancellation, just simply remove events after straggler event

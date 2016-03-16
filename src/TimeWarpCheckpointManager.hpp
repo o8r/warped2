@@ -103,9 +103,6 @@ namespace warped {
     NullCheckpointManager(Configuration const& config) :
       TimeWarpCheckpointManager{ config }
     {}
-
-  protected:
-    void generateCheckpoint() {}
   };
 
   

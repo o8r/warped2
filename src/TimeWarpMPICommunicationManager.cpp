@@ -8,6 +8,8 @@
 #include "utility/memory.hpp"
 #include "utility/warnings.hpp"
 
+WARPED_REGISTER_POLYMORPHIC_SERIALIZABLE_CLASS(warped::TimeWarpMPICommunicationManager)
+
 namespace warped {
 
 unsigned int TimeWarpMPICommunicationManager::initialize() {
@@ -156,7 +158,7 @@ void TimeWarpMPICommunicationManager::packAndSend(unsigned int receiver_id) {
                  max_buffer_size_, &message_position, MPI_COMM_WORLD);
     }
 
-    auto new_request = make_unique<PendingRequest>(std::unique_ptr<uint8_t[]>(message_buffer), message_position);
+    auto new_request = make_unique<PendingRequest>(std::unique_ptr<uint8_t[]>(message_buffer), max_buffer_size_, message_position);
     send_queue_->pending_request_list_.push_back(std::move(new_request));
 
     if (MPI_Isend(
@@ -190,7 +192,7 @@ unsigned int TimeWarpMPICommunicationManager::startReceiveRequests() {
 
         if (flag) {
 
-            auto new_request = make_unique<PendingRequest>(make_unique<uint8_t[]>(max_buffer_size_), max_buffer_size_);
+            auto new_request = make_unique<PendingRequest>(make_unique<uint8_t[]>(max_buffer_size_), max_buffer_size_, max_buffer_size_);
             recv_queue_->pending_request_list_.push_back(std::move(new_request));
 
             if (MPI_Irecv(

@@ -71,6 +71,8 @@ private:
         unsigned int min_send_timestamp_ = (unsigned int)-1;
         unsigned int min_recv_timestamp_ = (unsigned int)-1;
         std::mutex lock_;
+
+        WARPED_REGISTER_SERIALIZABLE_MEMBERS(color_, initial_color_, white_msg_count_, min_send_timestamp_, min_recv_timestamp_)
     } state_;
 
     // Accumulated clock minimum
@@ -97,6 +99,75 @@ private:
     std::unique_ptr<bool []> calculated_min_flag_;
 
     bool started_local_gvt_ = false;
+
+    friend class cereal::access;
+    template <typename Archive>
+    void save(Archive& ar) const {
+      ar(cereal::base_class<TimeWarpGVTManager>(this));
+
+      ar(state_, global_min_clock_, msg_count_, gvt_updated_, started_global_gvt_);
+      ar(local_gvt_flag_.load());
+
+      for (unsigned int i=0; i<num_worker_threads_+1; ++i)
+	ar(local_min_[i]);
+      for (unsigned int i=0; i<num_worker_threads_+1; ++i)
+	ar(send_min_[i]);
+      for (unsigned int i=0; i<num_worker_threads_+1; ++i)
+	ar(calculated_min_flag_[i]);
+
+      ar(started_local_gvt_);
+    }
+    template <typename Archive>
+    void load(Archive& ar) {
+      auto prev_num_worker_threads = num_worker_threads_;
+
+      ar(cereal::base_class<TimeWarpGVTManager>(this));
+      ar(state_, global_min_clock_, msg_count_, gvt_updated_, started_global_gvt_);
+
+      unsigned int local_gvt_flag;
+      ar(local_gvt_flag);
+      local_gvt_flag_.store(local_gvt_flag);
+
+      if (num_worker_threads_ != prev_num_worker_threads) {
+	local_min_ = make_unique<unsigned int[]>(num_worker_threads_+1);
+	send_min_ = make_unique<unsigned int[]>(num_worker_threads_+1);
+	calculated_min_flag_ = make_unique<bool[]>(num_worker_threads_+1);
+      }
+
+      for (unsigned int i=0; i<num_worker_threads_+1; ++i)
+	ar(local_min_[i]);
+      for (unsigned int i=0; i<num_worker_threads_+1; ++i)
+	ar(send_min_[i]);
+      for (unsigned int i=0; i<num_worker_threads_+1; ++i)
+	ar(calculated_min_flag_[i]);
+
+      ar(started_local_gvt_);
+    }
+    template <typename Archive>
+    static void load_and_construct(Archive& ar, cereal::construct<TimeWarpAsynchronousGVTManager>& construct) {
+      construct(nullptr, 0, 0);
+
+      ar(cereal::base_class<TimeWarpGVTManager>(construct.ptr()));
+      ar(construct->state_, construct->global_min_clock_, construct->msg_count_, construct->gvt_updated_, construct->started_global_gvt_);
+
+      unsigned int local_gvt_flag;
+      ar(local_gvt_flag);
+      construct->local_gvt_flag_.store(local_gvt_flag);
+
+      auto const N = construct->num_worker_threads_;
+      construct->local_min_ = make_unique<unsigned int[]>(N+1);
+      construct->send_min_ = make_unique<unsigned int[]>(N+1);
+      construct->calculated_min_flag_ = make_unique<bool[]>(N+1);
+
+      for (unsigned int i=0; i<N+1; ++i)
+	ar(construct->local_min_[i]);
+      for (unsigned int i=0; i<N+1; ++i)
+	ar(construct->send_min_[i]);
+      for (unsigned int i=0; i<N+1; ++i)
+	ar(construct->calculated_min_flag_[i]);
+
+      ar(construct->started_local_gvt_);
+    }
 };
 
 struct MatternGVTToken : public TimeWarpKernelMessage {

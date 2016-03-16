@@ -6,6 +6,7 @@
 
 #include "TimeWarpEventDispatcher.hpp"
 #include "TimeWarpKernelMessage.hpp"
+#include "serialization.hpp"
 
 namespace warped {
 
@@ -58,6 +59,35 @@ protected:
 
     unsigned int num_worker_threads_;
 
+private:
+    friend class cereal::access;  
+    template <typename Archive>
+    void save(Archive& ar) const {
+      ar(gVT_, gvt_start, gvt_stop, gvt_period_, gvt_state_, num_worker_threads_);
+    }
+    template <typename Archive>
+    void load(Archive& ar) {
+      ar(gVT_, gvt_start, gvt_stop, gvt_period_, gvt_state_, num_worker_threads_);
+    }
+    template <typename Archive>
+    static void load_and_construct(Archive& ar, cereal::construct<warped::TimeWarpGVTManager>& construct) {
+      unsigned int gvt;
+      std::chrono::time_point<std::chrono::steady_clock> gvt_start, gvt_stop;
+      unsigned int gvt_period;
+      warped::GVTState gvt_state;
+      unsigned int num_worker_threads;
+
+      ar(gvt, gvt_start, gvt_stop, gvt_period, gvt_state, num_worker_threads);
+
+      construct(nullptr, gvt_period, num_worker_threads);
+      construct->gVT_ = gvt;
+      construct->gvt_start = gvt_start;
+      construct->gvt_stop = gvt_stop;
+      //construct->gvt_period_ = gvt_period;
+      //construct->num_worker_threads_ = num_worker_threads;
+
+      //* @note restore comm_manager_ by calling restore() after loading from archive
+    }
 };
 
 }

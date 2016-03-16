@@ -5,14 +5,17 @@
 #include <vector>
 #include <memory>
 #include <list>
+#include <cassert>
 
 #include "FileStream.hpp"
 #include "RandomNumberGenerator.hpp"
+#include "LPState.hpp"
+#include "serialization.hpp"
 
 namespace warped {
 
 class Event;
-struct LPState;
+//struct LPState;
 class FileStream;
 class EventDispatcher;
 
@@ -31,6 +34,7 @@ public:
     // in an LPState class. This object is saved and restored repeatedly
     // during the course of the simulation.
     virtual LPState& getState() = 0;
+    LPState const& getState() const { return const_cast<LogicalProcess*>(this)->getState(); }
 
     // This is the main function of the LogicalProcess which processes incoming events.
     //
@@ -63,6 +67,48 @@ public:
 
     std::list<std::shared_ptr<RandomNumberGenerator>> rng_list_;
 
+    template <typename Archive>
+    void save(Archive& ar) const {
+      ar(name_, last_fossil_collect_gvt_, generation_);
+      ar(rng_list_);
+
+      std::unique_ptr<LPState> state { getState().clone() };
+      ar(state);
+    }
+    template <typename Archive>
+    void load(Archive& ar) {
+      std::string name;
+      ar(name);
+
+      // We cannot override name_
+      assert(name_ == name);
+
+      ar(last_fossil_collect_gvt_, generation_);
+      ar(rng_list_);
+
+      std::unique_ptr<LPState> state;
+      ar(state);
+      getState().restoreState(*state);
+    }
+
+    template <typename Archive>
+    static void load_and_construct(Archive& ar, cereal::construct<warped::LogicalProcess>& construct) {
+      std::string name;
+      unsigned int last_fossil_collect_gvt;
+      unsigned long long generation;
+      std::list<std::shared_ptr<RandomNumberGenerator>> rng_list;
+      std::unique_ptr<LPState> state;
+
+      ar(name, last_fossil_collect_gvt, generation, rng_list, state);
+
+      construct(name);
+      construct->last_fossil_collect_gvt_ = last_fossil_collect_gvt;
+      construct->generation_ = generation;
+      construct->rng_list_ = rng_list;
+
+      ar(state);
+      construct->getState().restoreState(*state);
+    }
 };
 
 template<class RNGType>
@@ -72,5 +118,6 @@ void LogicalProcess::registerRNG(std::shared_ptr<RNGType> new_rng) {
 }
 
 } // namespace warped
+
 
 #endif

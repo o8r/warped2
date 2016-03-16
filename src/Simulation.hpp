@@ -51,6 +51,12 @@ public:
         std::ios_base::openmode mode, std::shared_ptr<Event> this_event);
 
 private:
+    /** Restart simulation from the point saved in a checkpoint.
+     * @author O'HARA Mamoru
+     * @date 2016 Mar 13
+     */
+    void restart(std::vector<LogicalProcess*> const& lps, std::shared_ptr<TimeWarpCommunicationManager> comm_manager);
+
     void inline check(const std::vector<LogicalProcess*>& lps);
     Configuration config_;
     static std::unique_ptr<EventDispatcher> event_dispatcher_;

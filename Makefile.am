@@ -7,6 +7,7 @@ lib_LTLIBRARIES = libwarped.la
 # sorted.
 WARPED_INSTALL_HPP_FILES = \
     src/Configuration.hpp \
+	src/serialization_Configuration.hpp \
     src/FileStream.hpp \
     src/Event.hpp \
     src/LogicalProcess.hpp \
@@ -52,7 +53,9 @@ WARPED_NOINST_HPP_FILES = \
 	src/TimeWarpStatistics.hpp \
 	src/TimeWarpSynchronousGVTManager.hpp \
 	src/TimeWarpTerminationManager.hpp \
-    src/utility/strings.hpp
+    src/utility/strings.hpp \
+    src/TimeWarpCheckpointManager.hpp \
+        src/GVTSynchronizedCheckpointManager.hpp
 
 # All cpp files are listed in this variable
 WARPED_CPP_FILES = \
@@ -84,7 +87,9 @@ WARPED_CPP_FILES = \
     src/TimeWarpStateManager.cpp \
 	src/TimeWarpStatistics.cpp \
 	src/TimeWarpSynchronousGVTManager.cpp \
-	src/TimeWarpTerminationManager.cpp
+	src/TimeWarpTerminationManager.cpp \
+    src/TimeWarpCheckpointManager.cpp \
+        src/GVTSynchronizedCheckpointManager.cpp
 
 libwarped_la_SOURCES = \
     $(WARPED_INSTALL_HPP_FILES) \

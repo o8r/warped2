@@ -184,7 +184,7 @@ void TimeWarpStatistics::printStats() {
               << "\tEfficiency:                " << global_stats_[EFFICIENCY]*100.0 << "%\n\n"
 
               << "\tAverage maximum memory:    " << global_stats_[AVERAGE_MAX_MEMORY] << " MB\n"
-              << "\tGVT cycles:                " << global_stats_[GVT_CYCLES] 
+              << "\tGVT cycles:                " << global_stats_[GVT_CYCLES] << "\n\n"
 
 	      << "\tAverage time for rollback: " << global_stats_[ROLLBACK_TIME] << " sec\n"
 	      << "\tAverage time for recovery: " << global_stats_[RECOVERY_TIME] << " sec\n"

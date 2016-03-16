@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
+#include <sstream>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -10,6 +11,7 @@
 #include <utility>
 #include <vector>
 #include <iostream>
+#include <cassert>
 
 #include "json/json.h"
 
@@ -36,6 +38,7 @@
 #include "TimeWarpEventSet.hpp"
 #include "TimeWarpTerminationManager.hpp"
 #include "TimeWarpStatistics.hpp"
+#include "GVTSynchronizedCheckpointManager.hpp"
 
 namespace {
 const static std::string DEFAULT_CONFIG = R"x({
@@ -99,8 +102,21 @@ const static std::string DEFAULT_CONFIG = R"x({
     // The path to the statistics file that was created from a previous run.
     // Only used if "partitioning-type" is "profile-guided".
     "file": "statistics.out"
-}
+}, 
 
+"checkpointing": {
+    // Valid options are "none", "gvt-synchronized".
+    "type": "none",
+
+    // Checkpoint interval for gvt-synchronized
+    "interval": 100,
+
+    // The path to file in which checkpoint data will be saved.
+    "file": "checkpoint",
+
+    // Valid options are "on" and "off"
+    "restart": "off"
+}
 })x";
 
 
@@ -157,6 +173,20 @@ Configuration::Configuration(const std::string& model_description, int argc,
 { init(model_description, argc, argv, {}); }
 
 Configuration::~Configuration() = default;
+
+Configuration::Configuration(Configuration const& other) : 
+  config_file_name_{ other.config_file_name_ }, max_sim_time_{ other.max_sim_time_ },
+  root_{ new Json::Value(*other.root_) }
+{}
+Configuration&
+Configuration::operator=(Configuration const& other)
+{
+  config_file_name_ = other.config_file_name_;
+  max_sim_time_ = other.max_sim_time_;
+  root_ = make_unique<Json::Value>(*other.root_);
+  return *this;
+}
+
 
 void Configuration::readUserConfig() {
     if (!config_file_name_.empty()) {
@@ -306,6 +336,26 @@ Configuration::makeDispatcher(std::shared_ptr<TimeWarpCommunicationManager> comm
         std::unique_ptr<TimeWarpStatistics> tw_stats =
             make_unique<TimeWarpStatistics>(comm_manager, stats_file);
 
+	// CHECKPOINT
+	std::unique_ptr<TimeWarpCheckpointManager> checkpoint_manager;
+	auto type = (*root_)["checkpointing"]["type"].asString();
+	if (type == "none")
+	  checkpoint_manager = std::move(make_unique<NullCheckpointManager>(*this));
+	else if (type == "gvt-synchronized") {
+	  auto filepath = (*root_)["checkpointing"]["file"].asString();
+	  if (filepath.empty())
+	    filepath = "checkpoint";
+	  auto id = comm_manager->getID();
+	  std::ostringstream oss;
+	  oss << filepath << "." << id;
+	  (*root_)["checkpointing"]["file"] = oss.str();
+
+	  checkpoint_manager = std::move(make_unique<GVTSynchronizedCheckpointManager>(*this));
+	} else {
+	  invalid_string += "\tCheckpoint type\n";
+	}
+	assert(checkpoint_manager);
+
         if (!invalid_string.empty()) {
             throw std::runtime_error(std::string("Configuration files do not match, \
 check the following configurations:\n") + invalid_string);
@@ -368,7 +418,9 @@ check the following configurations:\n") + invalid_string);
             num_worker_threads, is_lp_migration_on, comm_manager,
             std::move(event_set), std::move(gvt_manager), std::move(state_manager),
             std::move(output_manager), std::move(twfs_manager),
-            std::move(termination_manager), std::move(tw_stats));
+	    std::move(termination_manager), std::move(tw_stats),
+	    std::move(checkpoint_manager)
+	);
     }
 
     if (comm_manager->getNumProcesses() > 1) {
@@ -449,5 +501,10 @@ std::shared_ptr<TimeWarpCommunicationManager> Configuration::makeCommunicationMa
     return std::make_shared<TimeWarpMPICommunicationManager>(max_msg_size, max_aggregate);
 }
 
-} // namespace warped
+bool Configuration::isRestarting() const
+{
+  auto const& restarting = (*root_)["checkpointing"]["restart"];
+  return restarting == "on";
+}
 
+} // namespace warped

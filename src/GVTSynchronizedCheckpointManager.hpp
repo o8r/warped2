@@ -35,7 +35,7 @@ namespace warped {
 		      TimeWarpStatistics& tw_stats
 		      ) override;
     bool onGVT(unsigned int gvt) override;
-    void generateCheckpoint() override;
+    void doGenerateCheckpoint(cereal::PortableBinaryOutputArchive& /*ar*/) override;
 
   private:
     struct Impl;

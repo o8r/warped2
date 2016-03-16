@@ -7,6 +7,7 @@
 #include <type_traits>  /* for remove_reference */
 
 #include "TimeWarpCommunicationManager.hpp"
+#include "serialization.hpp"
 
 namespace warped {
 
@@ -49,6 +50,11 @@ struct Stats {
     template<unsigned I>
     auto operator[](stats_index<I>) -> decltype(std::get<I>(stats_)) {
         return std::get<I>(stats_);
+    }
+
+    template <typename Archive>
+    void serialize(Archive& ar) {
+      ar(stats_);
     }
 };
 
@@ -166,6 +172,39 @@ private:
 
     unsigned int num_worker_threads_;
 
+    friend class cereal::access;
+    template <typename Archive>
+    void save(Archive& ar) const {
+      ar(stats_file_);
+      ar(num_worker_threads_);
+      ar(global_stats_);
+
+      for (unsigned int i=0; i<num_worker_threads_+1; ++i)
+	ar(local_stats_[i]);
+    }
+    template <typename Archive>
+    void load(Archive& ar) {
+      ar(stats_file_);
+      ar(num_worker_threads_);
+      ar(global_stats_);
+
+      initialize(num_worker_threads_, 0);  // 0 is dummy.
+
+      for (unsigned int i=0; i<num_worker_threads_+1; ++i)
+	ar(local_stats_[i]);
+    }
+    template <typename Archive>
+    static void load_and_construct(Archive& ar, cereal::construct<TimeWarpStatistics>& construct) {
+      std::string stats_file;
+      ar(stats_file);
+
+      construct(nullptr, stats_file);
+      ar(construct->num_worker_threads_);
+      ar(construct->global_stats_);
+
+      for (unsigned int i=0; i<construct->num_worker_threads_+1; ++i)
+	ar(construct->local_stats_[i]);
+    }
 };
 
 } // namespace warped

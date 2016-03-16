@@ -5,6 +5,7 @@
 #include <mutex>
 
 #include "TimeWarpCommunicationManager.hpp"
+#include "serialization.hpp"
 
 namespace warped {
 
@@ -56,6 +57,7 @@ private:
     std::shared_ptr<TimeWarpCommunicationManager> comm_manager_;
 
     std::unique_ptr<State []> state_by_thread_;
+    unsigned int num_worker_threads_;
     unsigned int active_thread_count_;
 
     int msg_count_ = 0;
@@ -63,6 +65,41 @@ private:
     bool is_master_ = false;
 
     bool terminate_ = false;
+
+    friend class cereal::access;
+    template <typename Archive>
+    void save(Archive& ar) const {
+      ar(state_, sticky_state_, msg_count_, is_master_, terminate_);
+      ar(num_worker_threads_);
+
+      for (unsigned int i=0; i<num_worker_threads_; ++i)
+	ar(state_by_thread_[i]);
+
+      ar(active_thread_count_);
+    }
+    template <typename Archive>
+    void load(Archive& ar) {
+      ar(state_, sticky_state_, msg_count_, is_master_, terminate_);
+      ar(num_worker_threads_);
+
+      state_by_thread_ = make_unique<State []>(num_worker_threads_);
+      for (unsigned int i=0; i<num_worker_threads_; ++i)
+	ar(state_by_thread_[i]);
+
+      ar(active_thread_count_);
+    }
+    template <typename Archive>
+    void load_and_construct(Archive& ar, cereal::construct<TimeWarpTerminationManager>& construct) {
+      construct(nullptr);
+      ar(construct->state_, construct->sticky_state_, construct->msg_count_, construct->is_master_,
+	 construct->terminate_, construct->num_worker_threads_);
+
+      construct->state_by_thread_ = make_unique<State []>(construct->num_worker_threads_);
+      for (unsigned int i=0; i<construct->num_worker_threads_; ++i)
+	ar(construct->state_by_thread_[i]);
+
+      ar(construct->active_thread_count_);
+    }
 };
 
 struct TerminationToken : public TimeWarpKernelMessage {

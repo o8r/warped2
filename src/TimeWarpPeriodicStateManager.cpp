@@ -1,10 +1,14 @@
 #include "TimeWarpPeriodicStateManager.hpp"
 #include "LogicalProcess.hpp"
+#include "serialization.hpp"
 #include "utility/memory.hpp"
+
+WARPED_REGISTER_POLYMORPHIC_SERIALIZABLE_CLASS(warped::TimeWarpPeriodicStateManager)
 
 namespace warped {
 
 void TimeWarpPeriodicStateManager::initialize(unsigned int num_local_lps) {
+    num_local_lps_ = num_local_lps;
 
     // Initialize counts to zero
     count_ = make_unique<unsigned int []>(num_local_lps);

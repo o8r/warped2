@@ -6,6 +6,8 @@
 
 #include "FileStream.hpp"
 
+namespace cereal { class PortableBinaryInputArchive; }
+
 namespace warped {
 
 class LogicalProcess;
@@ -26,6 +28,12 @@ public:
     // process events until a termination condition is reached.
     // The lps argument is a partitioned set of LogicalProcess
     virtual void startSimulation(const std::vector<std::vector<LogicalProcess*>>& lps) = 0;
+
+    /** Restart simulation from a checkpoint.
+     * @author O'HARA Mamoru
+     * @date 2016 Mar 13
+     */
+    virtual void restart(const std::vector<LogicalProcess*>&, cereal::PortableBinaryInputArchive&) {};
 
     virtual FileStream& getFileStream(LogicalProcess* lp, const std::string& filename,
         std::ios_base::openmode mode, std::shared_ptr<Event> this_event) = 0;

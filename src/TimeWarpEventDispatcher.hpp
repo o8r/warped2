@@ -31,6 +31,7 @@ class TimeWarpFileStreamManager;
 class TimeWarpEventSet;
 class TimeWarpGVTManager;
 class TimeWarpTerminationManager;
+class TimeWarpCheckpointManager;
 enum class Color;
 
 // This is the EventDispatcher that will run a Time Warp synchronized parallel simulation.
@@ -47,10 +48,12 @@ public:
         std::unique_ptr<TimeWarpOutputManager> output_manager,
         std::unique_ptr<TimeWarpFileStreamManager> twfs_manager,
         std::unique_ptr<TimeWarpTerminationManager> termination_manager,
-        std::unique_ptr<TimeWarpStatistics> tw_stats);
+        std::unique_ptr<TimeWarpStatistics> tw_stats,
+        std::unique_ptr<TimeWarpCheckpointManager> checkpoint_manager
+    );
 
     void startSimulation(const std::vector<std::vector<LogicalProcess*>>& lps);
-
+    void restart(std::vector<LogicalProcess*> const& lps, cereal::PortableBinaryInputArchive&) override;
 private:
     void sendEvents(std::shared_ptr<Event> source_event, std::vector<std::shared_ptr<Event>> new_events,
                     unsigned int sender_lp_id, LogicalProcess *sender_lp);
@@ -96,6 +99,7 @@ private:
     const std::unique_ptr<TimeWarpFileStreamManager> twfs_manager_;
     const std::unique_ptr<TimeWarpTerminationManager> termination_manager_;
     const std::unique_ptr<TimeWarpStatistics> tw_stats_;
+    const::std::unique_ptr<TimeWarpCheckpointManager> checkpoint_manager_;
 
     static thread_local unsigned int thread_id;
 };
