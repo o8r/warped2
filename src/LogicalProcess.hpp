@@ -70,7 +70,8 @@ public:
     template <typename Archive>
     void save(Archive& ar) const {
       ar(name_, last_fossil_collect_gvt_, generation_);
-      ar(rng_list_);
+      // ToDo: save RandomNumberGenerator
+      //ar(rng_list_);
 
       std::unique_ptr<LPState> state { getState().clone() };
       ar(state);
@@ -84,7 +85,9 @@ public:
       assert(name_ == name);
 
       ar(last_fossil_collect_gvt_, generation_);
-      ar(rng_list_);
+
+      // ToDo: load RandomNumberGenerator
+      //ar(rng_list_);
 
       std::unique_ptr<LPState> state;
       ar(state);
@@ -99,12 +102,17 @@ public:
       std::list<std::shared_ptr<RandomNumberGenerator>> rng_list;
       std::unique_ptr<LPState> state;
 
-      ar(name, last_fossil_collect_gvt, generation, rng_list, state);
+      ar(name, last_fossil_collect_gvt, generation);
+
+      // ToDo: load RandomNumberGenerator
+      //ar(rng_list);
+
+      ar(state);
 
       construct(name);
       construct->last_fossil_collect_gvt_ = last_fossil_collect_gvt;
       construct->generation_ = generation;
-      construct->rng_list_ = rng_list;
+      construct->rng_list_.swap(rng_list);
 
       ar(state);
       construct->getState().restoreState(*state);
