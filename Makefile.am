@@ -63,6 +63,7 @@ WARPED_CPP_FILES = \
     src/Configuration.cpp \
     src/TimeWarpEventSet.cpp \
     src/EventStatistics.cpp \
+    src/Event.cpp \
     src/FileStream.cpp \
     src/IndividualEventStatistics.cpp \
     src/LogicalProcess.cpp \

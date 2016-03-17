@@ -107,6 +107,8 @@ public:
     unsigned int timestamp() const { return 0; }
 
     std::string receiver_name_ = "";
+
+    WARPED_REGISTER_SERIALIZABLE_MEMBERS(cereal::base_class<Event>(this), receiver_name_)
 };
 
 /* Compares two events to see if one has a receive time less than to the other */
