@@ -19,11 +19,11 @@
 // TimeWarpCheckpointManager::Impl
 struct warped::TimeWarpCheckpointManager::Impl
 {
-  std::string const filepath;
+  Configuration configuration;
 
   unsigned int num_worker_threads;
-  Configuration configuration;
   std::vector<LogicalProcess*> lps;
+
   TimeWarpCommunicationManager const* comm_manager;
   TimeWarpEventSet const* event_set;
   TimeWarpGVTManager const* gvt_manager;
@@ -129,11 +129,12 @@ warped::TimeWarpCheckpointManager::blockIfNecessary()
 void
 warped::TimeWarpCheckpointManager::generateCheckpoint()
 {
-  assert(pimpl_ && !pimpl_->filepath.empty());
+  assert(pimpl_);
 
   auto now = std::chrono::steady_clock::now();
 
-  std::ofstream ofs { pimpl_->filepath, std::ios_base::out | std::ios_base::trunc };
+  auto filepath = pimpl_->configuration.root()["checkpointing"]["file"].asString();
+  std::ofstream ofs { filepath, std::ios_base::out | std::ios_base::trunc };
   cereal::PortableBinaryOutputArchive ar { ofs };
 
   ar(now);
