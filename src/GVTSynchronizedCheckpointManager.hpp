@@ -22,6 +22,8 @@ namespace warped {
     // ctors
     GVTSynchronizedCheckpointManager(Configuration const& config);
 
+    void onGVT(unsigned int gvt) override;
+
   protected:
     void doInitialize(unsigned int num_worker_threads,
 		      std::vector<LogicalProcess*> const& lps,
@@ -34,9 +36,9 @@ namespace warped {
 		      TimeWarpTerminationManager& termination_manager,
 		      TimeWarpStatistics& tw_stats
 		      ) override;
-    bool onGVT(unsigned int gvt) override;
     void doGenerateCheckpoint(cereal::PortableBinaryOutputArchive& /*ar*/) override;
-
+    void doBlock() override;
+    bool checkpointRequired() const override;
   private:
     struct Impl;
     std::shared_ptr<Impl> pimpl_;

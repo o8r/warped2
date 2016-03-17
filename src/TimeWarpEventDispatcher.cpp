@@ -96,6 +96,7 @@ void TimeWarpEventDispatcher::startSimulation(const std::vector<std::vector<Logi
             onGVT(gvt);
         }
 
+	checkpoint_manager_->checkpointIfNecessary();
     }
 
     comm_manager_->waitForAllProcesses();
@@ -213,7 +214,7 @@ void TimeWarpEventDispatcher::onGVT(unsigned int gvt) {
     uint64_t c = tw_stats_->upCount(GVT_CYCLES, num_worker_threads_);
     tw_stats_->updateAverage(AVERAGE_MAX_MEMORY, mem, c);
 
-    checkpoint_manager_->notifyGVTUpdate(gvt);
+    checkpoint_manager_->onGVT(gvt);
 }
 
 void TimeWarpEventDispatcher::processEvents(unsigned int id) {
@@ -297,7 +298,7 @@ void TimeWarpEventDispatcher::processEvents(unsigned int id) {
             // Save state
             state_manager_->saveState(event, current_lp_id, current_lp);
 	    
-	    checkpoint_manager_->notifyEvent(event);
+	    checkpoint_manager_->onEvent(event);
 
             // Send new events
             sendEvents(event, new_events, current_lp_id, current_lp);
@@ -336,8 +337,10 @@ void TimeWarpEventDispatcher::processEvents(unsigned int id) {
             // Just report infinite for a time.
             gvt_manager_->reportThreadMin((unsigned int)-1, thread_id, local_gvt_flag);
 
-	    checkpoint_manager_->notifyPassive();
+	    checkpoint_manager_->onPassive();
         }
+
+	checkpoint_manager_->blockIfNecessary();
     }
 }
 

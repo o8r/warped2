@@ -55,20 +55,16 @@ namespace warped {
     void load();
 
     // Event handlers
-    void notifyEvent(std::shared_ptr<Event> event) {
-      if (onEvent(event))
-	generateCheckpoint();
-    }
-    void notifyPassive() {
-      if (onPassive())
-	generateCheckpoint();
-    }
-    void notifyGVTUpdate(unsigned int gvt) {
-      if (onGVT(gvt))
-	generateCheckpoint();
-    }
+    virtual void onEvent(std::shared_ptr<Event> /*event*/) { }
+    virtual void onPassive() { }
+    virtual void onGVT(unsigned int /*gvt*/) { }
 
-    virtual void generateCheckpoint();
+    //* Called from TimeWarpEventDispatcher::startSimulation() (main thread) and generate a checkpoint if necessary.
+    void checkpointIfNecessary();
+    //* Called from TimeWarpEventDispatcher::processEvent() (worker threads) and block during checkpointing if necessary.
+    void blockIfNecessary();
+
+    void generateCheckpoint();
   protected:
     Configuration const& configuration() const;
 
@@ -84,10 +80,9 @@ namespace warped {
 			      TimeWarpStatistics& /*tw_stats*/
 			      ) 
     {}
-    virtual bool onEvent(std::shared_ptr<Event> /*event*/) { return false; }
-    virtual bool onPassive() { return false; }
-    virtual bool onGVT(unsigned int /*gvt*/) { return false; }
+    virtual bool checkpointRequired() const { return false; }
     virtual void doGenerateCheckpoint(cereal::PortableBinaryOutputArchive& /*ar*/) {}
+    virtual void doBlock() {}
     virtual bool terminateAfterCheckpoint() const { return false; }
 
   private:

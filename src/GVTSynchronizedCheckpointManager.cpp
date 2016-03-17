@@ -5,6 +5,7 @@
  */
 #include "GVTSynchronizedCheckpointManager.hpp"
 
+#include <atomic>
 #include <cassert>
 
 #include "Configuration.hpp"
@@ -15,6 +16,7 @@
 struct warped::GVTSynchronizedCheckpointManager::Impl
 {
   unsigned int interval, remaining;
+  std::atomic<bool> checkpointRequired;
   pthread_barrier_t gvt_coordinated_barrier;
 
   ~Impl() {
@@ -48,22 +50,36 @@ warped::GVTSynchronizedCheckpointManager::doInitialize
 
   pimpl_->interval = configuration().root()["checkpointing"]["interval"].asUInt();
   pimpl_->remaining = pimpl_->interval;
-
+  pimpl_->checkpointRequired.store(false);
   pthread_barrier_init(&pimpl_->gvt_coordinated_barrier, NULL, num_worker_threads+1);
 }
 
-bool
+void
 warped::GVTSynchronizedCheckpointManager::onGVT(unsigned int /*gvt*/)
 {
-  // All threads in all processes will block here after coordination of GVT
-  pthread_barrier_wait(&pimpl_->gvt_coordinated_barrier);
+  if (--pimpl_->remaining == 0)
+    pimpl_->checkpointRequired.store(true);
+}
 
-  return !(--pimpl_->remaining > 0);
+bool
+warped::GVTSynchronizedCheckpointManager::checkpointRequired() const
+{
+  return pimpl_->checkpointRequired.load();
 }
 
 void
 warped::GVTSynchronizedCheckpointManager::doGenerateCheckpoint(cereal::PortableBinaryOutputArchive&)
 {
   pimpl_->remaining = pimpl_->interval;
+  pimpl_->checkpointRequired.store(false);
+
+  pthread_barrier_wait(&pimpl_->gvt_coordinated_barrier);
 }
+
+void
+warped::GVTSynchronizedCheckpointManager::doBlock()
+{
+  pthread_barrier_wait(&pimpl_->gvt_coordinated_barrier);
+}
+
 

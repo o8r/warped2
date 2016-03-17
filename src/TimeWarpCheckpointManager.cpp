@@ -107,6 +107,23 @@ warped::TimeWarpCheckpointManager::initialize
 
 
 //////////////////////////////////////////////////////////////////////
+/** make a checkpoint if necessary.
+ */
+void
+warped::TimeWarpCheckpointManager::checkpointIfNecessary()
+{
+  if (checkpointRequired())
+    generateCheckpoint();
+}
+
+void
+warped::TimeWarpCheckpointManager::blockIfNecessary()
+{
+  if (checkpointRequired())
+    doBlock();
+}
+
+//////////////////////////////////////////////////////////////////////
 /** generateCheckpoint
  */
 void
