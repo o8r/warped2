@@ -8,7 +8,6 @@
 
 #include "serialization.hpp"
 #include "json/json.h"
-#include "utility/memory.hpp"
 
 namespace TCLAP { class Arg; }
 namespace Json { class Value; }
@@ -99,7 +98,7 @@ public:
       std::string json;
       ar(json);
 
-      auto root = make_unique<Json::Value>(json);
+      std::unique_ptr<Json::Value> root { new Json::Value(json) };
       config.root_ = std::move(root);
     }
 
