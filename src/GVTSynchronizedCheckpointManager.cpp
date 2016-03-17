@@ -16,6 +16,7 @@
 struct warped::GVTSynchronizedCheckpointManager::Impl
 {
   unsigned int interval, remaining;
+  int time_to_live;
   std::atomic<bool> checkpointRequired;
   pthread_barrier_t gvt_coordinated_barrier;
 
@@ -50,6 +51,7 @@ warped::GVTSynchronizedCheckpointManager::doInitialize
 
   pimpl_->interval = configuration().root()["checkpointing"]["interval"].asUInt();
   pimpl_->remaining = pimpl_->interval;
+  pimpl_->time_to_live = configuration().root()["checkpointing"]["count-till-termination"].asInt();
   pimpl_->checkpointRequired.store(false);
   pthread_barrier_init(&pimpl_->gvt_coordinated_barrier, NULL, num_worker_threads+1);
 }
@@ -72,6 +74,7 @@ warped::GVTSynchronizedCheckpointManager::doGenerateCheckpoint(cereal::PortableB
 {
   pimpl_->remaining = pimpl_->interval;
   pimpl_->checkpointRequired.store(false);
+  if (pimpl_->time_to_live > 0)  --pimpl_->time_to_live;
 
   pthread_barrier_wait(&pimpl_->gvt_coordinated_barrier);
 }
@@ -82,4 +85,8 @@ warped::GVTSynchronizedCheckpointManager::doBlock()
   pthread_barrier_wait(&pimpl_->gvt_coordinated_barrier);
 }
 
-
+bool
+warped::GVTSynchronizedCheckpointManager::terminateAfterCheckpoint() const
+{
+  return pimpl_->time_to_live == 0;
+}

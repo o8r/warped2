@@ -114,6 +114,9 @@ const static std::string DEFAULT_CONFIG = R"x({
     // The path to file in which checkpoint data will be saved.
     "file": "checkpoint",
 
+    // Terminate program after n-th checkpointing
+    "count-till-termination": -1,
+
     // Valid options are "on" and "off"
     "restart": "off"
 }

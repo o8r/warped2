@@ -39,6 +39,7 @@ namespace warped {
     void doGenerateCheckpoint(cereal::PortableBinaryOutputArchive& /*ar*/) override;
     void doBlock() override;
     bool checkpointRequired() const override;
+    bool terminateAfterCheckpoint() const override;
   private:
     struct Impl;
     std::shared_ptr<Impl> pimpl_;
