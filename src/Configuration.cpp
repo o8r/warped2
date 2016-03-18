@@ -106,7 +106,7 @@ const static std::string DEFAULT_CONFIG = R"x({
 
 "checkpointing": {
     // Valid options are "none", "gvt-synchronized".
-    "type": "none",
+    "method": "none",
 
     // Checkpoint interval for gvt-synchronized
     "interval": 100,
@@ -341,7 +341,7 @@ Configuration::makeDispatcher(std::shared_ptr<TimeWarpCommunicationManager> comm
 
 	// CHECKPOINT
 	std::unique_ptr<TimeWarpCheckpointManager> checkpoint_manager;
-	auto type = (*root_)["checkpointing"]["type"].asString();
+	auto type = (*root_)["checkpointing"]["method"].asString();
 	if (type == "none")
 	  checkpoint_manager = std::move(make_unique<NullCheckpointManager>(*this));
 	else if (type == "gvt-synchronized") {
