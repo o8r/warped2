@@ -81,8 +81,8 @@ public:
       std::string name;
       ar(name);
 
-      // We cannot override name_
-      assert(name_ == name);
+      // FIXME: We cannot override name_
+      // assert(name_ == name);
 
       ar(last_fossil_collect_gvt_, generation_);
 
