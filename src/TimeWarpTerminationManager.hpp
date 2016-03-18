@@ -4,6 +4,7 @@
 #include <memory>
 #include <mutex>
 
+#include "TerminationStatus.hpp"
 #include "TimeWarpCommunicationManager.hpp"
 #include "serialization.hpp"
 
@@ -44,10 +45,12 @@ public:
     bool nodePassive();
 
     // Check to see if we should terminate
-    bool terminationStatus();
+    TerminationStatus terminationStatus();
 
     void updateMsgCount(int delta);
 
+    //* Pause the simulation forcely for rejuvenation.
+    void pause();
 private:
 
     State state_ = State::ACTIVE;
@@ -64,7 +67,7 @@ private:
 
     bool is_master_ = false;
 
-    bool terminate_ = false;
+    TerminationStatus terminate_ = TS_NOT_TERMINATED;
 
     friend class cereal::access;
     template <typename Archive>

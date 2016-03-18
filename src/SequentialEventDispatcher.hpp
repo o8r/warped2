@@ -3,6 +3,7 @@
 
 #include <memory>
 #include <unordered_map>
+#include <cassert>
 
 #include "EventDispatcher.hpp"
 
@@ -16,8 +17,12 @@ class SequentialEventDispatcher : public EventDispatcher {
 public:
     SequentialEventDispatcher(unsigned int max_sim_time, std::unique_ptr<EventStatistics> stats);
 
-    void startSimulation(const std::vector<std::vector<LogicalProcess*>>& lps);
-
+    TerminationStatus startSimulation(const std::vector<std::vector<LogicalProcess*>>& lps) override;
+    TerminationStatus restart(const std::vector<LogicalProcess*>&, cereal::PortableBinaryInputArchive&) override {
+      assert(!"SequentialEventDispatcher does not support restarting from checkpoints");
+      throw std::runtime_error("SequentialEventDispatcher does not support restarting from checkpoints");
+      return TS_ERROR;
+    }
     FileStream& getFileStream(LogicalProcess* lp, const std::string& filename,
         std::ios_base::openmode mode, std::shared_ptr<Event> this_event);
 

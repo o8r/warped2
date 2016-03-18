@@ -35,11 +35,12 @@ Simulation::Simulation(const std::string& model_description, int argc, const cha
 Simulation::Simulation(const std::string& config_file_name, unsigned int max_sim_time)
     : config_(config_file_name, max_sim_time) {}
 
-void Simulation::simulate(const std::vector<LogicalProcess*>& lps) {
+TerminationStatus Simulation::simulate(const std::vector<LogicalProcess*>& lps) {
     check(lps);
 
     auto comm_manager = config_.makeCommunicationManager();
     unsigned int num_partitions = comm_manager->initialize();
+    TerminationStatus status;
 
     if (config_.isRestarting()) {
       restart(lps, comm_manager);
@@ -56,18 +57,21 @@ void Simulation::simulate(const std::vector<LogicalProcess*>& lps) {
       
       event_dispatcher_ = config_.makeDispatcher(comm_manager);
       
-      event_dispatcher_->startSimulation(local_partitions);
+      status = event_dispatcher_->startSimulation(local_partitions);
     }
 
     comm_manager->finalize();
+
+    return status;
 }
 
-void Simulation::simulate(const std::vector<LogicalProcess*>& lps,
+TerminationStatus Simulation::simulate(const std::vector<LogicalProcess*>& lps,
     std::unique_ptr<Partitioner> partitioner) {
     check(lps);
 
     auto comm_manager = config_.makeCommunicationManager();
     unsigned int num_partitions = comm_manager->initialize();
+    TerminationStatus status;
 
     if (config_.isRestarting()) {
       restart(lps, comm_manager);
@@ -85,13 +89,15 @@ void Simulation::simulate(const std::vector<LogicalProcess*>& lps,
       
       event_dispatcher_ = config_.makeDispatcher(comm_manager);
 
-      event_dispatcher_->startSimulation(local_partitions);
+      status = event_dispatcher_->startSimulation(local_partitions);
     }
 
     comm_manager->finalize();
+
+    return status;
 }
 
-void Simulation::restart(const std::vector<LogicalProcess*>& lps, std::shared_ptr<TimeWarpCommunicationManager> comm_manager)
+TerminationStatus Simulation::restart(const std::vector<LogicalProcess*>& lps, std::shared_ptr<TimeWarpCommunicationManager> comm_manager)
 {
   auto file = config_.root()["checkpointing"]["file"];
   if (file.empty()) file = "checkpoint";
@@ -116,7 +122,11 @@ void Simulation::restart(const std::vector<LogicalProcess*>& lps, std::shared_pt
 
   // make EventDispacher
   event_dispatcher_ = config_.makeDispatcher(comm_manager);
-  event_dispatcher_->restart(lps, ar);
+  auto status = event_dispatcher_->restart(lps, ar);
+
+  comm_manager->finalize();
+
+  return status;
 }
 
 void Simulation::check(const std::vector<LogicalProcess*>& lps) {

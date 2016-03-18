@@ -21,7 +21,7 @@ SequentialEventDispatcher::SequentialEventDispatcher(unsigned int max_sim_time,
                                                      std::unique_ptr<EventStatistics> stats)
     : EventDispatcher(max_sim_time), stats_(std::move(stats)) {}
 
-void SequentialEventDispatcher::startSimulation(
+TerminationStatus SequentialEventDispatcher::startSimulation(
     const std::vector<std::vector<LogicalProcess*>>& lps) {
     if (lps.size() != 1) {
         throw std::runtime_error(std::string("Sequential simulation only supports 1 partition."));
@@ -67,6 +67,8 @@ void SequentialEventDispatcher::startSimulation(
 
     std::cout << "Events processed: " << count << std::endl;
     stats_->writeToFile();
+
+    return TS_NORMAL;
 }
 
 FileStream& SequentialEventDispatcher::getFileStream(LogicalProcess* lp,

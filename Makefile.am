@@ -14,6 +14,7 @@ WARPED_INSTALL_HPP_FILES = \
     src/Partitioner.hpp \
 	src/RandomNumberGenerator.hpp \
     src/serialization.hpp \
+    src/TerminationStatus.hpp \
     src/Simulation.hpp \
     src/warped.hpp \
     src/utility/memory.hpp \

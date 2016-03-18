@@ -87,7 +87,10 @@ void TimeWarpTerminationManager::sendTerminator() {
 void TimeWarpTerminationManager::receiveTerminator(std::unique_ptr<TimeWarpKernelMessage> kmsg) {
     // We have received a terminator message. Just set terminate_ flag
     auto msg = unique_cast<TimeWarpKernelMessage, Terminator>(std::move(kmsg));
-    terminate_ = true;
+
+    state_lock_.lock();
+    terminate_ = TS_NORMAL;
+    state_lock_.unlock();
 }
 
 void TimeWarpTerminationManager::setThreadPassive(unsigned int thread_id) {
@@ -119,8 +122,8 @@ void TimeWarpTerminationManager::setThreadActive(unsigned int thread_id) {
     state_lock_.unlock();
 }
 
-bool TimeWarpTerminationManager::terminationStatus() {
-    return (terminate_ == true);
+TerminationStatus TimeWarpTerminationManager::terminationStatus() {
+    return terminate_;
 }
 
 bool TimeWarpTerminationManager::threadPassive(unsigned int thread_id) {
@@ -129,6 +132,12 @@ bool TimeWarpTerminationManager::threadPassive(unsigned int thread_id) {
 
 bool TimeWarpTerminationManager::nodePassive() {
     return (state_ == State::PASSIVE);
+}
+
+void TimeWarpTerminationManager::pause() {
+    state_lock_.lock();
+    terminate_ = TS_PAUSED;
+    state_lock_.unlock();
 }
 
 } // namespace warped

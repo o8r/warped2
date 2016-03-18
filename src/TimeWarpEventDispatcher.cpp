@@ -65,7 +65,7 @@ TimeWarpEventDispatcher::TimeWarpEventDispatcher(unsigned int max_sim_time,
 	checkpoint_manager_(std::move(checkpoint_manager))
 {}
 
-void TimeWarpEventDispatcher::startSimulation(const std::vector<std::vector<LogicalProcess*>>&
+TerminationStatus TimeWarpEventDispatcher::startSimulation(const std::vector<std::vector<LogicalProcess*>>&
                                               lps) {
     initialize(lps);
 
@@ -80,7 +80,8 @@ void TimeWarpEventDispatcher::startSimulation(const std::vector<std::vector<Logi
     auto sim_start = std::chrono::steady_clock::now();
 
     // Master thread main loop
-    while (!termination_manager_->terminationStatus()) {
+    TerminationStatus status;
+    while ((status = termination_manager_->terminationStatus()) == TS_NOT_TERMINATED) {
 
         comm_manager_->handleMessages();
 
@@ -106,7 +107,10 @@ void TimeWarpEventDispatcher::startSimulation(const std::vector<std::vector<Logi
                 std::chrono::steady_clock::period::num / std::chrono::steady_clock::period::den;
 
     if (comm_manager_->getID() == 0) {
+      if (status == TS_NORMAL)
         std::cout << "\nSimulation completed in " << num_seconds << " second(s)" << "\n\n";
+      else if (status == TS_PAUSED)
+	std::cout << "\nSimulation paused for rejuvenation\n\n";
     }
 
     for (auto& t: threads) {
@@ -125,9 +129,11 @@ void TimeWarpEventDispatcher::startSimulation(const std::vector<std::vector<Logi
         tw_stats_->writeToFile(num_seconds);
         tw_stats_->printStats();
     }
+
+    return status;
 }
 
-void TimeWarpEventDispatcher::restart(std::vector<LogicalProcess*> const& lps, cereal::PortableBinaryInputArchive& ar)
+TerminationStatus TimeWarpEventDispatcher::restart(std::vector<LogicalProcess*> const& lps, cereal::PortableBinaryInputArchive& ar)
 {
   ar(*event_set_, *gvt_manager_, *state_manager_, *output_manager_,
      *twfs_manager_, *termination_manager_, *tw_stats_);
@@ -152,7 +158,8 @@ void TimeWarpEventDispatcher::restart(std::vector<LogicalProcess*> const& lps, c
     auto sim_start = std::chrono::steady_clock::now();
 
     // Master thread main loop
-    while (!termination_manager_->terminationStatus()) {
+    TerminationStatus status;
+    while ((status = termination_manager_->terminationStatus()) == TS_NOT_TERMINATED) {
 
         comm_manager_->handleMessages();
 
@@ -196,6 +203,8 @@ void TimeWarpEventDispatcher::restart(std::vector<LogicalProcess*> const& lps, c
         tw_stats_->writeToFile(num_seconds);
         tw_stats_->printStats();
     }
+
+    return status;
 }
 
 void TimeWarpEventDispatcher::onGVT(unsigned int gvt) {

@@ -7,6 +7,7 @@
 #include "Configuration.hpp"
 #include "FileStream.hpp"
 #include "LogicalProcess.hpp"
+#include "TerminationStatus.hpp"
 
 namespace TCLAP { class Arg; }
 
@@ -38,13 +39,13 @@ public:
     //
     // If a Time Warp simulation is run, the lps will be automatically
     // partitioned.
-    void simulate(const std::vector<LogicalProcess*>& lps);
+    TerminationStatus simulate(const std::vector<LogicalProcess*>& lps);
 
     // A model can perform its own partitioning by calling this overload of simulate().
     //
     // The user supplied partition may not be used if a specific partitioner
     // is configured.
-    void simulate(const std::vector<LogicalProcess*>& lps,
+    TerminationStatus simulate(const std::vector<LogicalProcess*>& lps,
                   std::unique_ptr<Partitioner> partitioner);
 
     static FileStream& getFileStream(LogicalProcess* lp, const std::string& filename,
@@ -55,7 +56,7 @@ private:
      * @author O'HARA Mamoru
      * @date 2016 Mar 13
      */
-    void restart(std::vector<LogicalProcess*> const& lps, std::shared_ptr<TimeWarpCommunicationManager> comm_manager);
+    TerminationStatus restart(std::vector<LogicalProcess*> const& lps, std::shared_ptr<TimeWarpCommunicationManager> comm_manager);
 
     void inline check(const std::vector<LogicalProcess*>& lps);
     Configuration config_;

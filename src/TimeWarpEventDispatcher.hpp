@@ -52,8 +52,8 @@ public:
         std::unique_ptr<TimeWarpCheckpointManager> checkpoint_manager
     );
 
-    void startSimulation(const std::vector<std::vector<LogicalProcess*>>& lps);
-    void restart(std::vector<LogicalProcess*> const& lps, cereal::PortableBinaryInputArchive&) override;
+    TerminationStatus startSimulation(const std::vector<std::vector<LogicalProcess*>>& lps) override;
+    TerminationStatus restart(std::vector<LogicalProcess*> const& lps, cereal::PortableBinaryInputArchive&) override;
 private:
     void sendEvents(std::shared_ptr<Event> source_event, std::vector<std::shared_ptr<Event>> new_events,
                     unsigned int sender_lp_id, LogicalProcess *sender_lp);
