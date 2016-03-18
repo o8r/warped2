@@ -246,7 +246,7 @@ void TimeWarpEventDispatcher::processEvents(unsigned int id) {
     unsigned int local_gvt_flag;
     unsigned int gvt = 0;
 
-    while (!termination_manager_->terminationStatus()) {
+    while (termination_manager_->terminationStatus() == TS_NOT_TERMINATED) {
         // NOTE: local_gvt_flag must be obtained before getting the next event to avoid the
         //  "simultaneous reporting problem"
         local_gvt_flag = gvt_manager_->getLocalGVTFlag();

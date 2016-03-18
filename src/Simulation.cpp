@@ -27,25 +27,32 @@ std::unique_ptr<EventDispatcher> Simulation::event_dispatcher_;
 
 Simulation::Simulation(const std::string& model_description, int argc, const char* const* argv,
                        const std::vector<TCLAP::Arg*>& cmd_line_args)
-    : config_(model_description, argc, argv, cmd_line_args) {}
+  : config_(model_description, argc, argv, cmd_line_args), is_rank0_{false}
+ {}
 
 Simulation::Simulation(const std::string& model_description, int argc, const char* const* argv)
-    : config_(model_description, argc, argv) {}
+  : config_(model_description, argc, argv), is_rank0_{false}
+ {}
 
 Simulation::Simulation(const std::string& config_file_name, unsigned int max_sim_time)
-    : config_(config_file_name, max_sim_time) {}
+  : config_(config_file_name, max_sim_time), is_rank0_{false}
+ {}
 
 TerminationStatus Simulation::simulate(const std::vector<LogicalProcess*>& lps) {
     check(lps);
 
     auto comm_manager = config_.makeCommunicationManager();
     unsigned int num_partitions = comm_manager->initialize();
+    auto id = comm_manager->getID();
+    is_rank0_ = id == 0;
+
     TerminationStatus status;
 
+    auto partitioned_lps = config_.makePartitioner()->partition(lps, num_partitions);
+
     if (config_.isRestarting()) {
-      restart(lps, comm_manager);
+      restart(partitioned_lps[id], comm_manager);
     } else {
-      auto partitioned_lps = config_.makePartitioner()->partition(lps, num_partitions);
       comm_manager->initializeLPMap(partitioned_lps);
       
       comm_manager->waitForAllProcesses();
@@ -99,7 +106,7 @@ TerminationStatus Simulation::simulate(const std::vector<LogicalProcess*>& lps,
 
 TerminationStatus Simulation::restart(const std::vector<LogicalProcess*>& lps, std::shared_ptr<TimeWarpCommunicationManager> comm_manager)
 {
-  auto file = config_.root()["checkpointing"]["file"];
+  auto file = config_.root()["checkpointing"]["file"].asString();
   if (file.empty()) file = "checkpoint";
 
   auto id = comm_manager->getID();
@@ -140,6 +147,11 @@ FileStream& Simulation::getFileStream(LogicalProcess* lp, const std::string& fil
     std::ios_base::openmode mode, std::shared_ptr<Event> this_event) {
 
     return event_dispatcher_->getFileStream(lp, filename, mode, this_event);
+}
+
+bool Simulation::isMasterProcess() const
+{
+  return is_rank0_;
 }
 
 } // namepsace warped

@@ -51,6 +51,7 @@ public:
     static FileStream& getFileStream(LogicalProcess* lp, const std::string& filename,
         std::ios_base::openmode mode, std::shared_ptr<Event> this_event);
 
+    bool isMasterProcess() const;
 private:
     /** Restart simulation from the point saved in a checkpoint.
      * @author O'HARA Mamoru
@@ -60,6 +61,7 @@ private:
 
     void inline check(const std::vector<LogicalProcess*>& lps);
     Configuration config_;
+    bool is_rank0_;
     static std::unique_ptr<EventDispatcher> event_dispatcher_;
 };
 

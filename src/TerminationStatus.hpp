@@ -9,10 +9,10 @@
 namespace warped {
 
 enum TerminationStatus {
-  TS_NORMAL = -1, // Success
-  TS_NOT_TERMINATED = 0,
-  TS_PAUSED = EINTR,  // paused for rejuvenation
-  TS_ERROR = EINVAL,  // general error 
+  TS_NOT_TERMINATED = -1,
+  TS_NORMAL = 0, // Success
+  TS_PAUSED = 1,  // paused for rejuvenation
+  TS_ERROR = 666,  // general error 
 };
 
 }
