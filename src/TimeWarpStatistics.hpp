@@ -110,7 +110,7 @@ public:
     }
 
     template <unsigned I>
-    void updateAverage(stats_index<I> i, uint64_t new_val, unsigned int count) {
+    void updateAverage(stats_index<I> i, decltype(Stats()[i]) new_val, unsigned int count) {
         global_stats_[i] = (new_val + (count - 1) * global_stats_[i]) / (count);
     }
 
