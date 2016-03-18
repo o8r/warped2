@@ -106,13 +106,15 @@ TerminationStatus Simulation::restart(const std::vector<LogicalProcess*>& lps, s
   std::ostringstream filename;
   filename << file << "." << id;
 
+  auto load_start = std::chrono::steady_clock::now();
+
   // Open the checkpoint file
   std::ifstream ifs { filename.str() };
   cereal::PortableBinaryInputArchive ar { ifs };
 
   // Restore the time from which rejuvenation started
-  std::chrono::time_point<std::chrono::steady_clock> started;
-  ar(started);
+  std::chrono::time_point<std::chrono::steady_clock> saved;
+  ar(saved);
 
   // Restore Configuration
   ar(config_);
@@ -122,7 +124,7 @@ TerminationStatus Simulation::restart(const std::vector<LogicalProcess*>& lps, s
 
   // make EventDispacher
   event_dispatcher_ = config_.makeDispatcher(comm_manager);
-  auto status = event_dispatcher_->restart(lps, ar);
+  auto status = event_dispatcher_->restart(lps, ar, saved, load_start);
 
   comm_manager->finalize();
 

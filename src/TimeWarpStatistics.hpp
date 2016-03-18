@@ -44,7 +44,11 @@ struct Stats {
         double,                     // Time for positive events     21
         double,                     // Time for rollback            22
         double,                     // Time for recovery            23
-        uint64_t                    // dummy/number of elements     24
+        uint64_t,                   // Total checkpoints            24
+        double,                     // Time for save checkpoint     25
+        double,                     // Time for load checkpoint     26
+        double,                     // Time for rejuvenation        27
+        uint64_t                    // dummy/number of elements     28
     > stats_;
 
     template<unsigned I>
@@ -82,7 +86,11 @@ const stats_index<20> EFFICIENCY;
 const stats_index<21> POSITIVE_TIME;
 const stats_index<22> ROLLBACK_TIME;
 const stats_index<23> RECOVERY_TIME;
-const stats_index<24> NUM_STATISTICS;
+const stats_index<24> TOTAL_CHECKPOINTS;
+const stats_index<25> CHECKPOINT_SAVE_TIME;
+const stats_index<26> CHECKPOINT_LOAD_TIME;
+const stats_index<27> REJUVENATION_TIME;
+const stats_index<28> NUM_STATISTICS;
 
 class TimeWarpStatistics {
 public:
@@ -119,6 +127,15 @@ public:
     uint64_t upCount(stats_index<I> i, unsigned int thread_id, unsigned int num = 1) {
         local_stats_[thread_id][i] += num;
         return local_stats_[thread_id][i];
+    }
+    /** count up a global counter.
+     * @author O'HARA Mamoru
+     * @date 2016 Mar 18
+     */
+    template <unsigned I>
+    uint64_t upGlobalCount(stats_index<I> i, unsigned int num =1) {
+        global_stats_[i] += num;
+	return global_stats_[i];
     }
 
     template <unsigned I>

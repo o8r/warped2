@@ -101,6 +101,11 @@ void TimeWarpStatistics::calculateStats() {
             case RECOVERY_TIME.value:
                 sumReduceLocal(RECOVERY_TIME, recovery_time_by_node_);
                 break;
+            case TOTAL_CHECKPOINTS.value:
+            case CHECKPOINT_SAVE_TIME.value:
+            case CHECKPOINT_LOAD_TIME.value:
+            case REJUVENATION_TIME.value:
+		break;
 
             default:
                 break;
@@ -149,7 +154,11 @@ void TimeWarpStatistics::writeToFile(double num_seconds) {
         << global_stats_[EVENTS_COMMITTED]            << ",\t"
         << global_stats_[AVERAGE_MAX_MEMORY]          << ",\t"
         << global_stats_[ROLLBACK_TIME]               << ",\t"
-	<< global_stats_[RECOVERY_TIME]
+	<< global_stats_[RECOVERY_TIME]               << ",\t"
+	<< global_stats_[TOTAL_CHECKPOINTS]           << ",\t"
+	<< global_stats_[CHECKPOINT_SAVE_TIME]        << ",\t"
+        << global_stats_[CHECKPOINT_LOAD_TIME]        << ",\t"
+	<< global_stats_[REJUVENATION_TIME]           
 	<< std::endl;
 
     ofs.close();
@@ -187,7 +196,12 @@ void TimeWarpStatistics::printStats() {
               << "\tGVT cycles:                " << global_stats_[GVT_CYCLES] << "\n\n"
 
 	      << "\tAverage time for rollback: " << global_stats_[ROLLBACK_TIME] << " sec\n"
-	      << "\tAverage time for recovery: " << global_stats_[RECOVERY_TIME] << " sec\n"
+	      << "\tAverage time for recovery: " << global_stats_[RECOVERY_TIME] << " sec\n\n"
+
+	      << "\tTotal checkpoints:         " << global_stats_[TOTAL_CHECKPOINTS] << "\n"
+	      << "\tCheckpoint save time:      " << global_stats_[CHECKPOINT_SAVE_TIME] << " sec\n"
+	      << "\tCheckpoint load time:      " << global_stats_[CHECKPOINT_LOAD_TIME] << " sec\n"
+	      << "\tRejuvenation time:         " << global_stats_[REJUVENATION_TIME] << " sec\n"
 
 	      << std::endl;
 

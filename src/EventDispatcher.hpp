@@ -1,6 +1,7 @@
 #ifndef EVENT_DISPATCHER_HPP
 #define EVENT_DISPATCHER_HPP
 
+#include <chrono>
 #include <limits>
 #include <vector>
 
@@ -38,7 +39,9 @@ public:
      * @author O'HARA Mamoru
      * @date 2016 Mar 13
      */
-    virtual TerminationStatus restart(const std::vector<LogicalProcess*>&, cereal::PortableBinaryInputArchive&) =0;
+    virtual TerminationStatus restart(const std::vector<LogicalProcess*>&, cereal::PortableBinaryInputArchive&,
+				      std::chrono::time_point<std::chrono::steady_clock> const& rejuvenation_started,
+				      std::chrono::time_point<std::chrono::steady_clock> const& restarted) =0;
 
     virtual FileStream& getFileStream(LogicalProcess* lp, const std::string& filename,
         std::ios_base::openmode mode, std::shared_ptr<Event> this_event) = 0;

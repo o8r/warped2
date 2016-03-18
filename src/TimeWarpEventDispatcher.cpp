@@ -133,32 +133,44 @@ TerminationStatus TimeWarpEventDispatcher::startSimulation(const std::vector<std
     return status;
 }
 
-TerminationStatus TimeWarpEventDispatcher::restart(std::vector<LogicalProcess*> const& lps, cereal::PortableBinaryInputArchive& ar)
+TerminationStatus TimeWarpEventDispatcher::restart(std::vector<LogicalProcess*> const& lps, cereal::PortableBinaryInputArchive& ar,
+						   std::chrono::time_point<std::chrono::steady_clock> const& rejuvenation_started,
+						   std::chrono::time_point<std::chrono::steady_clock> const& restarted)
 {
-  ar(*event_set_, *gvt_manager_, *state_manager_, *output_manager_,
-     *twfs_manager_, *termination_manager_, *tw_stats_);
+    ar(*event_set_, *gvt_manager_, *state_manager_, *output_manager_,
+       *twfs_manager_, *termination_manager_, *tw_stats_);
 
-  // restore LPStates
-  unsigned int lp_id = 0;
-  for (LogicalProcess* lp: lps) {
-    ar(*lp);
-
-    lps_by_name_[lp->name_] = lp;
-    local_lp_id_by_name_[lp->name_] = lp_id;
-    lp_id++;
-  }
+    // restore LPStates
+    unsigned int lp_id = 0;
+    for (LogicalProcess* lp: lps) {
+      ar(*lp);
+      
+      lps_by_name_[lp->name_] = lp;
+      local_lp_id_by_name_[lp->name_] = lp_id;
+      lp_id++;
+    }
+    
+    auto load_end = std::chrono::steady_clock::now();
+    double load_sec = double((load_end - restarted).count()) *
+      std::chrono::steady_clock::period::num / std::chrono::steady_clock::period::den;
+    double rejuv_sec = double((load_end - rejuvenation_started).count()) *
+      std::chrono::steady_clock::period::num / std::chrono::steady_clock::period::den;
+    tw_stats_->updateAverage(CHECKPOINT_LOAD_TIME, load_sec, 1);
+    tw_stats_->updateAverage(REJUVENATION_TIME, rejuv_sec, 1);
 
     // Create worker threads
     std::vector<std::thread> threads;
+    TerminationStatus status { TS_NORMAL };
+#if 0
+    comm_manager_->waitForAllProcesses();
+
     for (unsigned int i = 0; i < num_worker_threads_; ++i) {
         auto thread(std::thread {&TimeWarpEventDispatcher::processEvents, this, i});
         threads.push_back(std::move(thread));
     }
 
-    auto sim_start = std::chrono::steady_clock::now();
 
     // Master thread main loop
-    TerminationStatus status;
     while ((status = termination_manager_->terminationStatus()) == TS_NOT_TERMINATED) {
 
         comm_manager_->handleMessages();
@@ -178,9 +190,11 @@ TerminationStatus TimeWarpEventDispatcher::restart(std::vector<LogicalProcess*> 
     }
 
     comm_manager_->waitForAllProcesses();
+#endif
+
     auto sim_stop = std::chrono::steady_clock::now();
 
-    double num_seconds = double((sim_stop - sim_start).count()) *
+    double num_seconds = double((sim_stop - load_end).count()) *
                 std::chrono::steady_clock::period::num / std::chrono::steady_clock::period::den;
 
     if (comm_manager_->getID() == 0) {

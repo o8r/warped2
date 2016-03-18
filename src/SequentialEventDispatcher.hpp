@@ -18,7 +18,9 @@ public:
     SequentialEventDispatcher(unsigned int max_sim_time, std::unique_ptr<EventStatistics> stats);
 
     TerminationStatus startSimulation(const std::vector<std::vector<LogicalProcess*>>& lps) override;
-    TerminationStatus restart(const std::vector<LogicalProcess*>&, cereal::PortableBinaryInputArchive&) override {
+    TerminationStatus restart(const std::vector<LogicalProcess*>&, cereal::PortableBinaryInputArchive&,
+			      std::chrono::time_point<std::chrono::steady_clock> const&,
+			      std::chrono::time_point<std::chrono::steady_clock> const&) override {
       assert(!"SequentialEventDispatcher does not support restarting from checkpoints");
       throw std::runtime_error("SequentialEventDispatcher does not support restarting from checkpoints");
       return TS_ERROR;

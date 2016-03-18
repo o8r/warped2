@@ -149,9 +149,19 @@ warped::TimeWarpCheckpointManager::generateCheckpoint()
 
   doGenerateCheckpoint(ar);
 
+  auto stop = std::chrono::steady_clock::now();
+  double num_seconds = double((stop - now).count()) * 
+    std::chrono::steady_clock::period::num / std::chrono::steady_clock::period::den;
+  auto c = pimpl_->tw_stats->upGlobalCount(TOTAL_CHECKPOINTS);
+  pimpl_->tw_stats->updateAverage(CHECKPOINT_SAVE_TIME, num_seconds, c);
+
   if (terminateAfterCheckpoint()) {
     // Force termination of all worker threads
+#if 0
     for (unsigned int i=0; i<pimpl_->num_worker_threads; ++i)
       pimpl_->termination_manager->setThreadPassive(i);
+#else
+    pimpl_->termination_manager->pause();
+#endif
   }
 }
