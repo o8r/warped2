@@ -98,7 +98,11 @@ public:
       std::string json;
       ar(json);
 
-      std::unique_ptr<Json::Value> root { new Json::Value(json) };
+      std::istringstream iss { json };
+      Json::Reader reader;
+      std::unique_ptr<Json::Value> root { new Json::Value };
+      reader.parse(iss, *root);
+
       config.root_ = std::move(root);
     }
 
@@ -120,7 +124,12 @@ namespace cereal {
 
       std::string json;
       ar(json);
-      std::unique_ptr<Json::Value> root{ new Json::Value(json) };
+
+      std::istringstream iss { json };
+      Json::Reader reader;
+      std::unique_ptr<Json::Value> root{ new Json::Value };
+      reader.parse(iss, *root);
+
       construct->root_ = std::move(root);
     }
   };
