@@ -124,7 +124,7 @@ warped::TimeWarpCheckpointManager::blockIfNecessary()
 }
 
 //////////////////////////////////////////////////////////////////////
-/** generateCheckpoint
+/** called from the main thread of TimeWarpEventDispatcher.
  */
 void
 warped::TimeWarpCheckpointManager::generateCheckpoint()
@@ -152,6 +152,7 @@ warped::TimeWarpCheckpointManager::generateCheckpoint()
   auto stop = std::chrono::steady_clock::now();
   double num_seconds = double((stop - now).count()) * 
     std::chrono::steady_clock::period::num / std::chrono::steady_clock::period::den;
+
   auto c = pimpl_->tw_stats->upGlobalCount(TOTAL_CHECKPOINTS);
   pimpl_->tw_stats->updateAverage(CHECKPOINT_SAVE_TIME, num_seconds, c);
 
