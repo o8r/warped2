@@ -66,7 +66,7 @@ warped::GVTSynchronizedCheckpointManager::onGVT(unsigned int /*gvt*/)
 bool
 warped::GVTSynchronizedCheckpointManager::checkpointRequired() const
 {
-  return pimpl_->checkpointRequired.load() == 0;
+  return pimpl_->checkpointRequired.load();
 }
 
 void
