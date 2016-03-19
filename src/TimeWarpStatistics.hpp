@@ -45,10 +45,11 @@ struct Stats {
         double,                     // Time for rollback            22
         double,                     // Time for recovery            23
         uint64_t,                   // Total checkpoints            24
-        double,                     // Time for save checkpoint     25
-        double,                     // Time for load checkpoint     26
-        double,                     // Time for rejuvenation        27
-        uint64_t                    // dummy/number of elements     28
+        double,                     // Checkpoint size              25
+        double,                     // Time for save checkpoint     26
+        double,                     // Time for load checkpoint     27
+        double,                     // Time for rejuvenation        28
+        uint64_t                    // dummy/number of elements     29
     > stats_;
 
     template<unsigned I>
@@ -87,10 +88,11 @@ const stats_index<21> POSITIVE_TIME;
 const stats_index<22> ROLLBACK_TIME;
 const stats_index<23> RECOVERY_TIME;
 const stats_index<24> TOTAL_CHECKPOINTS;
-const stats_index<25> CHECKPOINT_SAVE_TIME;
-const stats_index<26> CHECKPOINT_LOAD_TIME;
-const stats_index<27> REJUVENATION_TIME;
-const stats_index<28> NUM_STATISTICS;
+const stats_index<25> CHECKPOINT_SIZE;
+const stats_index<26> CHECKPOINT_SAVE_TIME;
+const stats_index<27> CHECKPOINT_LOAD_TIME;
+const stats_index<28> REJUVENATION_TIME;
+const stats_index<29> NUM_STATISTICS;
 
 class TimeWarpStatistics {
 public:
@@ -110,7 +112,7 @@ public:
     }
 
     template <unsigned I>
-    void updateAverage(stats_index<I> i, decltype(Stats()[i]) new_val, unsigned int count) {
+    void updateAverage(stats_index<I> i, typename std::remove_reference<decltype(Stats()[i])>::type new_val, unsigned int count) {
         global_stats_[i] = (new_val + (count - 1) * global_stats_[i]) / (count);
     }
 
@@ -119,7 +121,7 @@ public:
      * @date 2016 Mar 3
      */
     template <unsigned I>
-    void updateLocalAverage(stats_index<I> i, unsigned int thread_id, decltype(Stats()[i]) new_val, unsigned int count) {
+    void updateLocalAverage(stats_index<I> i, unsigned int thread_id, typename std::remove_reference<decltype(Stats()[i])>::type new_val, unsigned int count) {
         local_stats_[thread_id][i] = (new_val + (count-1) * local_stats_[thread_id][i]) / (count);
     }
 

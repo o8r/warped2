@@ -3,6 +3,14 @@
 #include <chrono>
 #include <cassert>
 
+#if 1 || defined(linux)
+/* for stat() */
+extern "C" {
+#include <sys/types.h>
+#include <sys/stat.h>
+}
+#endif
+
 #include "Configuration.hpp"
 // for serialization
 #include "TimeWarpCommunicationManager.hpp" 
@@ -134,27 +142,34 @@ warped::TimeWarpCheckpointManager::generateCheckpoint()
   auto now = std::chrono::steady_clock::now();
 
   auto filepath = pimpl_->configuration.root()["checkpointing"]["file"].asString();
-  std::ofstream ofs { filepath, std::ios_base::out | std::ios_base::trunc };
-  cereal::PortableBinaryOutputArchive ar { ofs };
+  {
+    std::ofstream ofs { filepath, std::ios_base::out | std::ios_base::trunc };
+    cereal::PortableBinaryOutputArchive ar { ofs };
 
-  ar(now);
+    ar(now);
+    
+    ar(pimpl_->configuration, *pimpl_->comm_manager, *pimpl_->event_set, *pimpl_->gvt_manager,
+       *pimpl_->state_manager, *pimpl_->output_manager, *pimpl_->twfs_manager, *pimpl_->termination_manager,
+       *pimpl_->tw_stats);
 
-  ar(pimpl_->configuration, *pimpl_->comm_manager, *pimpl_->event_set, *pimpl_->gvt_manager,
-     *pimpl_->state_manager, *pimpl_->output_manager, *pimpl_->twfs_manager, *pimpl_->termination_manager,
-     *pimpl_->tw_stats);
+    // archive Logical processes
+    for (LogicalProcess* lp: pimpl_->lps)
+      ar(*lp);
 
-  // archive Logical processes
-  for (LogicalProcess* lp: pimpl_->lps)
-    ar(*lp);
-
-  doGenerateCheckpoint(ar);
+    doGenerateCheckpoint(ar);
+  }  // close the checkpoint file
 
   auto stop = std::chrono::steady_clock::now();
   double num_seconds = double((stop - now).count()) * 
     std::chrono::steady_clock::period::num / std::chrono::steady_clock::period::den;
-
+    
   auto c = pimpl_->tw_stats->upGlobalCount(TOTAL_CHECKPOINTS);
   pimpl_->tw_stats->updateAverage(CHECKPOINT_SAVE_TIME, num_seconds, c);
+
+  // Get size of the checkpoint file
+  struct stat buf;
+  stat(filepath.c_str(), &buf);
+  pimpl_->tw_stats->updateAverage(CHECKPOINT_SIZE, static_cast<double>(buf.st_size) / 1000000, c);
 
   if (terminateAfterCheckpoint()) {
     // Force termination of all worker threads

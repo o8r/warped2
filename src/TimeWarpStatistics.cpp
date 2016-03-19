@@ -102,6 +102,7 @@ void TimeWarpStatistics::calculateStats() {
                 sumReduceLocal(RECOVERY_TIME, recovery_time_by_node_);
                 break;
             case TOTAL_CHECKPOINTS.value:
+            case CHECKPOINT_SIZE.value:
             case CHECKPOINT_SAVE_TIME.value:
             case CHECKPOINT_LOAD_TIME.value:
             case REJUVENATION_TIME.value:
@@ -156,6 +157,7 @@ void TimeWarpStatistics::writeToFile(double num_seconds) {
         << global_stats_[ROLLBACK_TIME]               << ",\t"
 	<< global_stats_[RECOVERY_TIME]               << ",\t"
 	<< global_stats_[TOTAL_CHECKPOINTS]           << ",\t"
+	<< global_stats_[CHECKPOINT_SIZE]             << ",\t"
 	<< global_stats_[CHECKPOINT_SAVE_TIME]        << ",\t"
         << global_stats_[CHECKPOINT_LOAD_TIME]        << ",\t"
 	<< global_stats_[REJUVENATION_TIME]           
@@ -199,6 +201,7 @@ void TimeWarpStatistics::printStats() {
 	      << "\tAverage time for recovery: " << global_stats_[RECOVERY_TIME] << " sec\n\n"
 
 	      << "\tTotal checkpoints:         " << global_stats_[TOTAL_CHECKPOINTS] << "\n"
+	      << "\tCheckpoint size:           " << global_stats_[CHECKPOINT_SIZE] << " MB\n"
 	      << "\tCheckpoint save time:      " << global_stats_[CHECKPOINT_SAVE_TIME] << " sec\n"
 	      << "\tCheckpoint load time:      " << global_stats_[CHECKPOINT_LOAD_TIME] << " sec\n"
 	      << "\tRejuvenation time:         " << global_stats_[REJUVENATION_TIME] << " sec\n"
