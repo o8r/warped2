@@ -141,8 +141,8 @@ public:
     }
 
     template <unsigned I>
-    void sumReduceLocal(stats_index<I> j, typename std::remove_reference<decltype(Stats()[j])>::type *recv_array) {
-      using value_type = typename std::remove_const<typename std::remove_reference<decltype(Stats()[j])>::type>::type;
+    void sumReduceLocal(stats_index<I> j, typename std::remove_reference<decltype(Stats()[j])>::type *& recv_array) {
+        using value_type = typename std::remove_const<typename std::remove_reference<decltype(Stats()[j])>::type>::type;
         value_type local_count = 0;
 
         for (unsigned int i = 0; i < num_worker_threads_+1; i++) {
