@@ -161,9 +161,10 @@ TerminationStatus TimeWarpEventDispatcher::restart(std::vector<LogicalProcess*> 
     // Create worker threads
     std::vector<std::thread> threads;
     TerminationStatus status { TS_NORMAL };
-#if 0
+
     comm_manager_->waitForAllProcesses();
 
+#if 0
     for (unsigned int i = 0; i < num_worker_threads_; ++i) {
         auto thread(std::thread {&TimeWarpEventDispatcher::processEvents, this, i});
         threads.push_back(std::move(thread));
