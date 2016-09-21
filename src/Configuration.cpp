@@ -124,6 +124,12 @@ const static std::string DEFAULT_CONFIG = R"x({
 "simulating-rejuvenation": {
     // Valid options are "none", "round-robin", "synchronous".
     "method": "none"
+
+    // Rejuvenation interval
+    "interval": 300,
+
+    // Mean rejuvenation time
+    "mean-time": 10
 }
 })x";
 
@@ -344,25 +350,43 @@ Configuration::makeDispatcher(std::shared_ptr<TimeWarpCommunicationManager> comm
         std::unique_ptr<TimeWarpStatistics> tw_stats =
             make_unique<TimeWarpStatistics>(comm_manager, stats_file);
 
-	// CHECKPOINT
-	std::unique_ptr<TimeWarpCheckpointManager> checkpoint_manager;
-	auto type = (*root_)["checkpointing"]["method"].asString();
-	if (type == "none")
-	  checkpoint_manager = std::move(make_unique<NullCheckpointManager>(*this));
-	else if (type == "gvt-synchronized") {
-	  auto filepath = (*root_)["checkpointing"]["file"].asString();
-	  if (filepath.empty())
-	    filepath = "checkpoint";
-	  auto id = comm_manager->getID();
-	  std::ostringstream oss;
-	  oss << filepath << "." << id;
-	  (*root_)["checkpointing"]["file"] = oss.str();
+        // CHECKPOINT
+        std::unique_ptr<TimeWarpCheckpointManager> checkpoint_manager;
+        auto type = (*root_)["checkpointing"]["method"].asString();
+        if (type == "none")
+          checkpoint_manager = std::move(make_unique<NullCheckpointManager>(*this));
+        else if (type == "gvt-synchronized") {
+          auto filepath = (*root_)["checkpointing"]["file"].asString();
+          if (filepath.empty())
+            filepath = "checkpoint";
+          auto id = comm_manager->getID();
+          std::ostringstream oss;
+          oss << filepath << "." << id;
+          (*root_)["checkpointing"]["file"] = oss.str();
+          
+          checkpoint_manager = std::move(make_unique<GVTSynchronizedCheckpointManager>(*this));
+        } else {
+          invalid_string += "\tCheckpoint type\n";
+        }
+        assert(checkpoint_manager);
 
-	  checkpoint_manager = std::move(make_unique<GVTSynchronizedCheckpointManager>(*this));
-	} else {
-	  invalid_string += "\tCheckpoint type\n";
-	}
-	assert(checkpoint_manager);
+        // REJUVENATION SIMULATION
+        //  21 SEP 2016: O'HARA
+        auto rejuv_type = (*root_)["simulating-rejuvenation"]["method"].asString();
+        float first_rejuv, rejuv_interval=0.0, rejuv_time;
+        if (rejuv_type != "none") {
+          rejuv_interval = (*root_)["simulating-rejuvenation"]["interval"].asFloat();
+          rejuv_time = (*root_)["simulating-rejuvenation"]["mean-time"].asFloat();
+        }
+        if (rejuv_type == "round-robin") {
+          auto np = comm_manager->getNumProcesses();
+          assert(np > 0);
+          auto id = comm_manager->getID();
+          assert(id < np);
+          first_rejuv = rejuv_interval / np * (id+1);
+        } else if (rejuv_type == "synchronous") {
+          first_rejuv = rejuv_interval;
+        }
 
         if (!invalid_string.empty()) {
             throw std::runtime_error(std::string("Configuration files do not match, \
@@ -426,9 +450,10 @@ check the following configurations:\n") + invalid_string);
             num_worker_threads, is_lp_migration_on, comm_manager,
             std::move(event_set), std::move(gvt_manager), std::move(state_manager),
             std::move(output_manager), std::move(twfs_manager),
-	    std::move(termination_manager), std::move(tw_stats),
-	    std::move(checkpoint_manager)
-	);
+            std::move(termination_manager), std::move(tw_stats),
+            std::move(checkpoint_manager),
+            first_rejuv, rejuv_interval, rejuv_time
+       );
     }
 
     if (comm_manager->getNumProcesses() > 1) {

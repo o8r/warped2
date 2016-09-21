@@ -49,7 +49,10 @@ public:
         std::unique_ptr<TimeWarpFileStreamManager> twfs_manager,
         std::unique_ptr<TimeWarpTerminationManager> termination_manager,
         std::unique_ptr<TimeWarpStatistics> tw_stats,
-        std::unique_ptr<TimeWarpCheckpointManager> checkpoint_manager
+        std::unique_ptr<TimeWarpCheckpointManager> checkpoint_manager,
+        float first_rjvsim = -1.0,  //< Time to perform the 1st rejuvenation
+        float rjvsim_interval = 0.0,  //< Time interval of rejuvenation simulation.
+        float rjvsim_time = 5.0  //< Mean rejuvenation time in the simulation.
     );
 
     TerminationStatus startSimulation(const std::vector<std::vector<LogicalProcess*>>& lps) override;
@@ -102,6 +105,10 @@ private:
     const std::unique_ptr<TimeWarpTerminationManager> termination_manager_;
     const std::unique_ptr<TimeWarpStatistics> tw_stats_;
     const::std::unique_ptr<TimeWarpCheckpointManager> checkpoint_manager_;
+
+    float first_rejuvenation_;
+    float rejuvenation_interval_sec_;
+    float rejuvenation_time_sec_;
 
     static thread_local unsigned int thread_id;
 };

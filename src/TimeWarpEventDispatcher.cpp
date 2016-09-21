@@ -54,7 +54,9 @@ TimeWarpEventDispatcher::TimeWarpEventDispatcher(unsigned int max_sim_time,
     std::unique_ptr<TimeWarpFileStreamManager> twfs_manager,
     std::unique_ptr<TimeWarpTerminationManager> termination_manager,
     std::unique_ptr<TimeWarpStatistics> tw_stats,
-    std::unique_ptr<TimeWarpCheckpointManager> checkpoint_manager)
+    std::unique_ptr<TimeWarpCheckpointManager> checkpoint_manager,
+    float first_rjvsim, float rjvsim_interval, float rjvsim_time
+)
  :
         EventDispatcher(max_sim_time), num_worker_threads_(num_worker_threads),
         is_lp_migration_on_(is_lp_migration_on), 
@@ -62,7 +64,8 @@ TimeWarpEventDispatcher::TimeWarpEventDispatcher(unsigned int max_sim_time,
         gvt_manager_(std::move(gvt_manager)), state_manager_(std::move(state_manager)),
         output_manager_(std::move(output_manager)), twfs_manager_(std::move(twfs_manager)),
         termination_manager_(std::move(termination_manager)), tw_stats_(std::move(tw_stats)),
-	checkpoint_manager_(std::move(checkpoint_manager))
+        checkpoint_manager_(std::move(checkpoint_manager)),
+        first_rejuvenation_(first_rjvsim), rejuvenation_interval_sec_(rjvsim_interval), rejuvenation_time_sec_(rjvsim_time)
 {}
 
 TerminationStatus TimeWarpEventDispatcher::startSimulation(const std::vector<std::vector<LogicalProcess*>>&
@@ -97,7 +100,7 @@ TerminationStatus TimeWarpEventDispatcher::startSimulation(const std::vector<std
             onGVT(gvt);
         }
 
-	checkpoint_manager_->checkpointIfNecessary();
+        checkpoint_manager_->checkpointIfNecessary();
     }
 
     comm_manager_->waitForAllProcesses();
@@ -110,7 +113,7 @@ TerminationStatus TimeWarpEventDispatcher::startSimulation(const std::vector<std
       if (status == TS_NORMAL)
         std::cout << "\nSimulation completed in " << num_seconds << " second(s)" << "\n\n";
       else if (status == TS_PAUSED)
-	std::cout << "\nSimulation paused for rejuvenation\n\n";
+        std::cout << "\nSimulation paused for rejuvenation\n\n";
     }
 
     for (auto& t: threads) {
@@ -247,6 +250,12 @@ void TimeWarpEventDispatcher::processEvents(unsigned int id) {
     unsigned int local_gvt_flag;
     unsigned int gvt = 0;
 
+    auto pid = comm_manager_->getID();
+
+    // Record the time at which the simulation thread started
+    auto simulation_started = std::chrono::steady_clock::now();
+    auto last_rejuvenation = simulation_started;
+
     while (termination_manager_->terminationStatus() == TS_NOT_TERMINATED) {
         // NOTE: local_gvt_flag must be obtained before getting the next event to avoid the
         //  "simultaneous reporting problem"
@@ -313,7 +322,22 @@ void TimeWarpEventDispatcher::processEvents(unsigned int id) {
                 if (found) tw_stats_->upCount(CANCELLED_EVENTS, thread_id);
                 continue;
             }
-
+            
+            // 21 SEP 2016 O'HARA
+            // Simulate rejuvenation
+            auto t = std::chrono::steady_clock::now();
+            auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(t - simulation_started).count();
+            if (rejuvenation_interval_sec_ > 0
+                && first_rejuvenation_ <= elapsed
+                && (last_rejuvenation == simulation_started
+                    || rejuvenation_interval_sec_ <= std::chrono::duration_cast<std::chrono::seconds>(t - last_rejuvenation).count())) {
+              last_rejuvenation = t;
+              // Sleep a while
+              std::cout << "P#" << pid << ":" << thread_id << " starts rejuvenation...\n";
+              std::this_thread::sleep_for(std::chrono::milliseconds((int)(rejuvenation_time_sec_ * 1000)));
+              std::cout << "P#" << pid << ":" << thread_id << " finishes rejuvenation." << std::endl;
+            }
+                
             // process event and get new events
             auto new_events = current_lp->receiveEvent(*event);
 
@@ -322,7 +346,7 @@ void TimeWarpEventDispatcher::processEvents(unsigned int id) {
             // Save state
             state_manager_->saveState(event, current_lp_id, current_lp);
 	    
-	    checkpoint_manager_->onEvent(event);
+            checkpoint_manager_->onEvent(event);
 
             // Send new events
             sendEvents(event, new_events, current_lp_id, current_lp);
@@ -350,7 +374,7 @@ void TimeWarpEventDispatcher::processEvents(unsigned int id) {
             event_set_->acquireInputQueueLock(current_lp_id);
             event_set_->replenishScheduler(current_lp_id);
             event_set_->releaseInputQueueLock(current_lp_id);
-
+                
         } else {
             // This thread no longer has anything to do because it's schedule queue is empty.
             if (!termination_manager_->threadPassive(thread_id)) {
