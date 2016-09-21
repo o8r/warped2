@@ -123,7 +123,7 @@ const static std::string DEFAULT_CONFIG = R"x({
 
 "simulating-rejuvenation": {
     // Valid options are "none", "round-robin", "synchronous".
-    "method": "none"
+    "method": "none",
 
     // Rejuvenation interval
     "interval": 300,
