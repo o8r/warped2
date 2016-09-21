@@ -46,7 +46,7 @@ TerminationStatus Simulation::simulate(const std::vector<LogicalProcess*>& lps) 
     auto id = comm_manager->getID();
     is_rank0_ = id == 0;
 
-    TerminationStatus status;
+    TerminationStatus status {};
 
     auto partitioned_lps = config_.makePartitioner()->partition(lps, num_partitions);
 
@@ -78,7 +78,7 @@ TerminationStatus Simulation::simulate(const std::vector<LogicalProcess*>& lps,
 
     auto comm_manager = config_.makeCommunicationManager();
     unsigned int num_partitions = comm_manager->initialize();
-    TerminationStatus status;
+    TerminationStatus status {};
 
     if (config_.isRestarting()) {
       restart(lps, comm_manager);
