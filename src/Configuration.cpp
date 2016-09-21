@@ -119,6 +119,11 @@ const static std::string DEFAULT_CONFIG = R"x({
 
     // Valid options are "on" and "off"
     "restart": "off"
+},
+
+"simulating-rejuvenation": {
+    // Valid options are "none", "round-robin", "synchronous".
+    "method": "none"
 }
 })x";
 
