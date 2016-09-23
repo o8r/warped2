@@ -331,11 +331,12 @@ void TimeWarpEventDispatcher::processEvents(unsigned int id) {
                 && first_rejuvenation_ <= elapsed
                 && (last_rejuvenation == simulation_started
                     || rejuvenation_interval_sec_ <= std::chrono::duration_cast<std::chrono::seconds>(t - last_rejuvenation).count())) {
-              last_rejuvenation = t;
               // Sleep a while
+              auto wait = std::chrono::milliseconds((int)(rejuvenation_time_sec_ * 1000));
               std::cout << "P#" << pid << ":" << thread_id << " starts rejuvenation...\n";
-              std::this_thread::sleep_for(std::chrono::milliseconds((int)(rejuvenation_time_sec_ * 1000)));
+              std::this_thread::sleep_for(wait);
               std::cout << "P#" << pid << ":" << thread_id << " finishes rejuvenation." << std::endl;
+              last_rejuvenation = t + wait;
             }
                 
             // process event and get new events
