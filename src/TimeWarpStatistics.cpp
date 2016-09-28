@@ -101,12 +101,16 @@ void TimeWarpStatistics::calculateStats() {
             case RECOVERY_TIME.value:
                 sumReduceLocal(RECOVERY_TIME, recovery_time_by_node_);
                 break;
+            case TOTAL_REJUVENATION.value:
+                sumReduceLocal(TOTAL_REJUVENATION, rejuvenation_count_by_node_);
+                break;
+
             case TOTAL_CHECKPOINTS.value:
             case CHECKPOINT_SIZE.value:
             case CHECKPOINT_SAVE_TIME.value:
             case CHECKPOINT_LOAD_TIME.value:
             case REJUVENATION_TIME.value:
-		break;
+              break;
 
             default:
                 break;
@@ -135,9 +139,10 @@ void TimeWarpStatistics::writeToFile(double num_seconds) {
             << cancelled_events_by_node_[i]     << ",\t"
             << processed_events_by_node_[i]     << ",\t"
             << committed_events_by_node_[i]     << ",\t"
-	    << rollback_time_by_node_[i]        << ",\t"
-	    << recovery_time_by_node_[i]        
-	    << std::endl;
+            << rollback_time_by_node_[i]        << ",\t"
+            << recovery_time_by_node_[i]        << ",\t"
+            << rejuvenation_count_by_node_[i]
+            << std::endl;
     }
 
     ofs << "Total"                                    << ",\t"
@@ -155,13 +160,14 @@ void TimeWarpStatistics::writeToFile(double num_seconds) {
         << global_stats_[EVENTS_COMMITTED]            << ",\t"
         << global_stats_[AVERAGE_MAX_MEMORY]          << ",\t"
         << global_stats_[ROLLBACK_TIME]               << ",\t"
-	<< global_stats_[RECOVERY_TIME]               << ",\t"
-	<< global_stats_[TOTAL_CHECKPOINTS]           << ",\t"
-	<< global_stats_[CHECKPOINT_SIZE]             << ",\t"
-	<< global_stats_[CHECKPOINT_SAVE_TIME]        << ",\t"
+        << global_stats_[RECOVERY_TIME]               << ",\t"
+        << global_stats_[TOTAL_CHECKPOINTS]           << ",\t"
+        << global_stats_[CHECKPOINT_SIZE]             << ",\t"
+        << global_stats_[CHECKPOINT_SAVE_TIME]        << ",\t"
         << global_stats_[CHECKPOINT_LOAD_TIME]        << ",\t"
-	<< global_stats_[REJUVENATION_TIME]           
-	<< std::endl;
+        << global_stats_[REJUVENATION_TIME]           << ",\t"
+        << global_stats_[TOTAL_REJUVENATION]
+        << std::endl;
 
     ofs.close();
 }
@@ -197,14 +203,15 @@ void TimeWarpStatistics::printStats() {
               << "\tAverage maximum memory:    " << global_stats_[AVERAGE_MAX_MEMORY] << " MB\n"
               << "\tGVT cycles:                " << global_stats_[GVT_CYCLES] << "\n\n"
 
-	      << "\tAverage time for rollback: " << global_stats_[ROLLBACK_TIME] << " sec\n"
-	      << "\tAverage time for recovery: " << global_stats_[RECOVERY_TIME] << " sec\n\n"
+              << "\tAverage time for rollback: " << global_stats_[ROLLBACK_TIME] << " sec\n"
+              << "\tAverage time for recovery: " << global_stats_[RECOVERY_TIME] << " sec\n\n"
 
-	      << "\tTotal checkpoints:         " << global_stats_[TOTAL_CHECKPOINTS] << "\n"
-	      << "\tCheckpoint size:           " << global_stats_[CHECKPOINT_SIZE] << " MB\n"
-	      << "\tCheckpoint save time:      " << global_stats_[CHECKPOINT_SAVE_TIME] << " sec\n"
-	      << "\tCheckpoint load time:      " << global_stats_[CHECKPOINT_LOAD_TIME] << " sec\n"
-	      << "\tRejuvenation time:         " << global_stats_[REJUVENATION_TIME] << " sec\n"
+              << "\tTotal checkpoints:         " << global_stats_[TOTAL_CHECKPOINTS] << "\n"
+              << "\tCheckpoint size:           " << global_stats_[CHECKPOINT_SIZE] << " MB\n"
+              << "\tCheckpoint save time:      " << global_stats_[CHECKPOINT_SAVE_TIME] << " sec\n"
+              << "\tCheckpoint load time:      " << global_stats_[CHECKPOINT_LOAD_TIME] << " sec\n"
+              << "\tRejuvenation time:         " << global_stats_[REJUVENATION_TIME] << " sec\n"
+              << "\tTotal rejuvenation count:  " << global_stats_[TOTAL_REJUVENATION] << "\n"
 
 	      << std::endl;
 
@@ -222,6 +229,7 @@ void TimeWarpStatistics::printStats() {
     delete [] committed_events_by_node_;
     delete [] rollback_time_by_node_;
     delete [] recovery_time_by_node_;
+    delete [] rejuvenation_count_by_node_;
 }
 
 } // namespace warped

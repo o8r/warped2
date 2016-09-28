@@ -49,7 +49,8 @@ struct Stats {
         double,                     // Time for save checkpoint     26
         double,                     // Time for load checkpoint     27
         double,                     // Time for rejuvenation        28
-        uint64_t                    // dummy/number of elements     29
+        uint64_t,                   // Number of rejuvenation       29
+        uint64_t                    // dummy/number of elements     30
     > stats_;
 
     template<unsigned I>
@@ -92,7 +93,8 @@ const stats_index<25> CHECKPOINT_SIZE;
 const stats_index<26> CHECKPOINT_SAVE_TIME;
 const stats_index<27> CHECKPOINT_LOAD_TIME;
 const stats_index<28> REJUVENATION_TIME;
-const stats_index<29> NUM_STATISTICS;
+  const stats_index<29> TOTAL_REJUVENATION;
+const stats_index<30> NUM_STATISTICS;
 
 class TimeWarpStatistics {
 public:
@@ -108,7 +110,7 @@ public:
      */
     template <unsigned I>
     auto getLocal(stats_index<I> i, unsigned int thread_id) const -> decltype(Stats()[i]) {
-	return local_stats_[thread_id][i];
+      return local_stats_[thread_id][i];
     }
 
     template <unsigned I>
@@ -137,7 +139,7 @@ public:
     template <unsigned I>
     uint64_t upGlobalCount(stats_index<I> i, unsigned int num =1) {
         global_stats_[i] += num;
-	return global_stats_[i];
+        return global_stats_[i];
     }
 
     template <unsigned I>
@@ -184,6 +186,7 @@ private:
     uint64_t *num_objects_by_node_;
     double* rollback_time_by_node_;
     double* recovery_time_by_node_;
+    uint64_t* rejuvenation_count_by_node_;
 
     std::shared_ptr<TimeWarpCommunicationManager> comm_manager_;
 
@@ -199,7 +202,7 @@ private:
       ar(global_stats_);
 
       for (unsigned int i=0; i<num_worker_threads_+1; ++i)
-	ar(local_stats_[i]);
+        ar(local_stats_[i]);
     }
     template <typename Archive>
     void load(Archive& ar) {
@@ -210,7 +213,7 @@ private:
       initialize(num_worker_threads_, 0);  // 0 is dummy.
 
       for (unsigned int i=0; i<num_worker_threads_+1; ++i)
-	ar(local_stats_[i]);
+        ar(local_stats_[i]);
     }
     template <typename Archive>
     static void load_and_construct(Archive& ar, cereal::construct<TimeWarpStatistics>& construct) {
@@ -222,7 +225,7 @@ private:
       ar(construct->global_stats_);
 
       for (unsigned int i=0; i<construct->num_worker_threads_+1; ++i)
-	ar(construct->local_stats_[i]);
+        ar(construct->local_stats_[i]);
     }
 };
 

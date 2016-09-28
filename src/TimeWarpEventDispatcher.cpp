@@ -338,6 +338,8 @@ void TimeWarpEventDispatcher::processEvents(unsigned int id) {
               std::cout << "P#" << pid << ":" << thread_id << " finishes rejuvenation." << std::endl;
               last_rejuvenation = t + wait;
 
+              tw_stats_->upCount(TOTAL_REJUVENATION, thread_id);
+
               if (oneshot_rejuvenation_)
                 rejuvenation_interval_sec_ = 0;
             }
