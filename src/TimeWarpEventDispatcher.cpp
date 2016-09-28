@@ -55,7 +55,7 @@ TimeWarpEventDispatcher::TimeWarpEventDispatcher(unsigned int max_sim_time,
     std::unique_ptr<TimeWarpTerminationManager> termination_manager,
     std::unique_ptr<TimeWarpStatistics> tw_stats,
     std::unique_ptr<TimeWarpCheckpointManager> checkpoint_manager,
-    float first_rjvsim, float rjvsim_interval, float rjvsim_time
+    float first_rjvsim, float rjvsim_interval, float rjvsim_time, bool oneshot_rjv
 )
  :
         EventDispatcher(max_sim_time), num_worker_threads_(num_worker_threads),
@@ -65,7 +65,7 @@ TimeWarpEventDispatcher::TimeWarpEventDispatcher(unsigned int max_sim_time,
         output_manager_(std::move(output_manager)), twfs_manager_(std::move(twfs_manager)),
         termination_manager_(std::move(termination_manager)), tw_stats_(std::move(tw_stats)),
         checkpoint_manager_(std::move(checkpoint_manager)),
-        first_rejuvenation_(first_rjvsim), rejuvenation_interval_sec_(rjvsim_interval), rejuvenation_time_sec_(rjvsim_time)
+        first_rejuvenation_(first_rjvsim), rejuvenation_interval_sec_(rjvsim_interval), rejuvenation_time_sec_(rjvsim_time), oneshot_rejuvenation_(oneshot_rjv)
 {}
 
 TerminationStatus TimeWarpEventDispatcher::startSimulation(const std::vector<std::vector<LogicalProcess*>>&
@@ -337,6 +337,9 @@ void TimeWarpEventDispatcher::processEvents(unsigned int id) {
               std::this_thread::sleep_for(wait);
               std::cout << "P#" << pid << ":" << thread_id << " finishes rejuvenation." << std::endl;
               last_rejuvenation = t + wait;
+
+              if (oneshot_rejuvenation_)
+                rejuvenation_interval_sec_ = 0;
             }
                 
             // process event and get new events

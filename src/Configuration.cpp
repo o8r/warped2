@@ -129,7 +129,10 @@ const static std::string DEFAULT_CONFIG = R"x({
     "interval": 300,
 
     // Mean rejuvenation time
-    "mean-time": 10
+    "mean-time": 10,
+
+    // Valid options are "on", "off".
+    "oneshot": "off"
 }
 })x";
 
@@ -372,8 +375,10 @@ Configuration::makeDispatcher(std::shared_ptr<TimeWarpCommunicationManager> comm
 
         // REJUVENATION SIMULATION
         //  21 SEP 2016: O'HARA
-        auto rejuv_type = (*root_)["simulating-rejuvenation"]["method"].asString();
+        auto const& rejuv_type = (*root_)["simulating-rejuvenation"]["method"].asString();
         float first_rejuv, rejuv_interval=0.0, rejuv_time;
+        auto oneshot_rejuv_string = (*root_)["simulating-rejuvenation"]["oneshot"].asString();
+        bool oneshot_rejuv = oneshot_rejuv_string=="on" ? true : false;
         if (rejuv_type != "none") {
           rejuv_interval = (*root_)["simulating-rejuvenation"]["interval"].asFloat();
           rejuv_time = (*root_)["simulating-rejuvenation"]["mean-time"].asFloat();
@@ -437,6 +442,8 @@ check the following configurations:\n") + invalid_string);
                       << "GVT Period:                " << gvt_period << " ms" << "\n"
                       << "Max simulation time:       " \
                         << (max_sim_time_ ? std::to_string(max_sim_time_) : "infinity") << std::endl << std::endl;
+            std::cout << "Rejuvenation sim.:         " << rejuv_type << "\n"
+                      << "                   oneshot=" << oneshot_rejuv_string << std::endl << std::endl;
 
             auto output_config_file = (*root_)["time-warp"]["config-output-file"].asString();
             if (output_config_file != "none") {
@@ -452,7 +459,7 @@ check the following configurations:\n") + invalid_string);
             std::move(output_manager), std::move(twfs_manager),
             std::move(termination_manager), std::move(tw_stats),
             std::move(checkpoint_manager),
-            first_rejuv, rejuv_interval, rejuv_time
+            first_rejuv, rejuv_interval, rejuv_time, oneshot_rejuv
        );
     }
 
